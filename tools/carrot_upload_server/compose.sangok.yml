@@ -1,0 +1,34 @@
+services:
+  carrot-upload:
+    build: .
+    image: carrot-upload:1.0.3-sangok
+    container_name: carrot-upload
+    restart: unless-stopped
+    init: true
+    environment:
+      CARROT_UPLOAD_ROOT: /data/openpilot
+      CARROT_UPLOAD_DB: /data/openpilot/tmux/.state/uploads.sqlite3
+      CARROT_DAILY_DEVICE_QUOTA_BYTES: "4294967296"
+      CARROT_DAILY_IP_QUOTA_BYTES: "8589934592"
+      CARROT_MAX_FILE_BYTES: "536870912"
+      CARROT_MIN_FREE_BYTES: "107374182400"
+      CARROT_SESSION_TTL_SECONDS: "14400"
+      CARROT_CONCURRENT_PER_DEVICE: "3"
+      CARROT_CONCURRENT_GLOBAL: "4"
+      # 주인님 C3X Dongle ID만 허용 (쉼표로 여러 대 가능). 빈 값이면 모두 거부.
+      CARROT_ALLOWED_DEVICES: ""
+    ports:
+      - "127.0.0.1:18080:8080"
+    user: "1026:100"
+    group_add:
+      - "101"
+    volumes:
+      - /volume1/openpilot:/data/openpilot
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
