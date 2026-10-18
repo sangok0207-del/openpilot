@@ -54,11 +54,15 @@ class Config:
   session_issue_limit: int = 30
   session_issue_window_seconds: int = 10 * 60
   trusted_proxy_networks: tuple[str, ...] = ("127.0.0.0/8", "::1/128", "172.16.0.0/12")
+  # Private server: only these Dongle IDs may open sessions (None = unrestricted).
+  allowed_devices: frozenset[str] | None = None
 
   @classmethod
   def from_env(cls) -> Config:
     root = Path(os.environ.get("CARROT_UPLOAD_ROOT", "/data/uploads"))
+    allowed = os.environ.get("CARROT_ALLOWED_DEVICES")
     return cls(
+      allowed_devices=None if allowed is None else frozenset(v.strip() for v in allowed.split(",") if v.strip()),
       storage_root=root,
       db_path=Path(os.environ.get("CARROT_UPLOAD_DB", "/data/state/uploads.sqlite3")),
       daily_device_quota=_env_int("CARROT_DAILY_DEVICE_QUOTA_BYTES", GIB, MIB),
@@ -236,6 +240,11 @@ class UploadService:
     if not isinstance(body, dict):
       raise web.HTTPBadRequest(text="JSON object is required")
     device = self._validate_device(body.get("deviceId") or body.get("dongleId"))
+    if self.config.allowed_devices is not None and device not in self.config.allowed_devices:
+      # Logged so the owner can enroll a new device from `docker logs`.
+      print(f"rejected session: device={device} car={self._clean_metadata(body.get('carName'))!r} "
+            f"ip={self.source_ip(request)}", flush=True)
+      raise web.HTTPForbidden(text="device is not allowed on this server")
     purpose = str(body.get("purpose") or "upload").strip().lower()
     if purpose not in {"dashcam", "tmux", "test"}:
       raise web.HTTPBadRequest(text="invalid purpose")
