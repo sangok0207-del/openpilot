@@ -22,6 +22,16 @@ def temperature_label(health):
   return f'{value:.1f}°C', color
 
 
+def latency_label(state, fallback_color):
+  """Badge title with the vehicle-measured model round trip (modelV2 execution time)."""
+  if getattr(state, 'external_compute_connected', None) is False:
+    return 'jetSON 끊김', ERROR
+  latency = getattr(state, 'external_compute_latency_ms', None)
+  if isinstance(latency, (int, float)) and math.isfinite(latency):
+    return f'jetSON {latency:.0f}ms', NORMAL if latency < 50 else WARNING
+  return 'jetSON', fallback_color
+
+
 def health_banner(health, language):
   thermal = health.get('thermal_severity')
   if thermal in ('warning', 'error'):
@@ -49,18 +59,22 @@ class HealthRenderer(ClusterUiRenderer):
     self.host_badge_drawn = False
     super().render(state, signal_lights)
 
-  def _temperature_badge(self, x, y):
+  def _temperature_badge(self, x, y, state=None):
     label, color = temperature_label(self.host_health)
-    rect = rl.Rectangle(x - 52, y - 17, 104, 60)
+    title, title_color = latency_label(state, color)
+    width = 104 if title == 'jetSON' else 128
+    # Keep the left edge fixed; a wider badge grows into the empty road area on the right.
+    x += (width - 104) / 2
+    rect = rl.Rectangle(x - width / 2, y - 17, width, 60)
     rl.draw_rectangle_rounded(rect, .25, 8, rl_color((0, 0, 0), 190))
     rl.draw_rectangle_rounded_lines_ex(rect, .25, 8, 2., rl_color(color))
-    self._draw_text('jetSON', x, y, 19, color, anchor='center')
+    self._draw_text(title, x, y, 19, title_color, anchor='center')
     self._draw_text(label, x, y + 26, 20, color, anchor='center')
     self.host_badge_drawn = True
 
   def _draw_egpu_status(self, state):
     # The normal status row's transform also follows left/right panel swaps.
-    self._temperature_badge(EGPU_STATUS_CENTER_X + 20, TOP_STATUS_CENTER_Y)
+    self._temperature_badge(EGPU_STATUS_CENTER_X + 20, TOP_STATUS_CENTER_Y, state)
 
   def _draw_alert_overlay(self, alert):
     rl.rl_push_matrix()
