@@ -109,6 +109,10 @@ OPENPILOT_ADDON_FONT_DIR = SELFDRIVE_DIR / "assets" / "addon" / "font"
 KAIGEN_GOTHIC_KR_BOLD_FONT_PATH = OPENPILOT_FONT_DIR / "KaiGenGothicKR-Bold.ttf"
 JETBRAINS_MONO_FONT_PATH = OPENPILOT_FONT_DIR / "JetBrainsMono-Medium.ttf"
 VEHICLE_MODEL_PATH = CLUSTER_DIR / "assets" / "models" / "cybertruck" / "cybertruck_cluster.obj"
+# Car-specific meshes used only for the ego vehicle (ClusterUiState.vehicle_body)
+EGO_BODY_MODEL_PATHS = {
+    "nexo": CLUSTER_DIR / "assets" / "models" / "nexo" / "nexo_cluster.obj",
+}
 TPMS_CAR_ICON_PATH = CLUSTER_DIR / "assets" / "images" / "tpms_toy_car.png"
 SPEED_BG_PATH = SELFDRIVE_DIR / "assets" / "images" / "speed_bg.png"
 TRAFFIC_RED_ICON_PATH = SELFDRIVE_DIR / "assets" / "images" / "traffic_red.png"
@@ -422,6 +426,7 @@ WORLD_LABEL_TEXTURE_SIZE_GRID = 0.25
 WORLD_LABEL_TEXTURE_PADDING_PX = 4
 VEHICLE_MATERIAL_COLORS: dict[str, tuple[int, int, int, int]] = {
     "body": (156, 166, 172, 255),
+    "nexo_white": (226, 230, 233, 255),
     "wheel": (18, 20, 22, 255),
     "besi_roda": (36, 38, 42, 255),
     "light": (184, 222, 255, 255),
@@ -952,6 +957,8 @@ class ClusterUiRenderer:
         self._nv12_dmabuf_pool_disabled = False
         self._vehicle_model = None
         self._vehicle_model_load_attempted = False
+        self._ego_body = "default"
+        self._ego_body_models: dict[str, object | None] = {}
         self._scene_cache_key: tuple[object, ...] | None = None
         self._scene_cache: ClusterScene | None = None
         self._speed_bg_texture = None
@@ -1349,6 +1356,10 @@ class ClusterUiRenderer:
             rl.unload_model(self._vehicle_model)
             self._vehicle_model = None
         self._vehicle_model_load_attempted = False
+        for model in self._ego_body_models.values():
+            if model is not None:
+                rl.unload_model(model)
+        self._ego_body_models = {}
         self._scene_cache_key = None
         self._scene_cache = None
         self._camera_overlay_strip_points = None
@@ -1500,6 +1511,7 @@ class ClusterUiRenderer:
         """Draw one frame into the currently active raylib render target."""
         if signal_lights is None:
             signal_lights = self._turn_signal_lights(state)
+        self._ego_body = state.vehicle_body
         profile_stage = self._profile_start()
         if self.screen_mode in (CLUSTER_SCREEN_MODE_DEBUG_GRAPH, CLUSTER_SCREEN_MODE_NAVI):
             self._clear_world()
@@ -2857,11 +2869,14 @@ class ClusterUiRenderer:
         if self._vehicle_model_load_attempted:
             return
         self._vehicle_model_load_attempted = True
-        if not VEHICLE_MODEL_PATH.exists():
-            return
+        self._vehicle_model = self._load_mesh_model(VEHICLE_MODEL_PATH, "Cybertruck")
+
+    def _load_mesh_model(self, path: Path, label: str):
+        if not path.exists():
+            return None
         try:
             profile_stage = self._profile_start()
-            mesh = self._load_obj_mesh(VEHICLE_MODEL_PATH)
+            mesh = self._load_obj_mesh(path)
             self._profile_add("vehicle_model.parse_obj", profile_stage)
             profile_stage = self._profile_start()
             rl.upload_mesh(rl.ffi.addressof(mesh), False)
@@ -2871,11 +2886,21 @@ class ClusterUiRenderer:
             self._profile_add("vehicle_model.load_from_mesh", profile_stage)
             if not rl.is_model_valid(model):
                 rl.unload_model(model)
-                return
-            self._vehicle_model = model
+                return None
+            return model
         except Exception as exc:
-            print(f"Cybertruck vehicle model load failed: {exc}")
-            self._vehicle_model = None
+            print(f"{label} vehicle model load failed: {exc}")
+            return None
+
+    def _ego_body_model(self):
+        """Car-specific ego mesh, loaded once on first use; None keeps the default mesh."""
+        body = self._ego_body
+        path = EGO_BODY_MODEL_PATHS.get(body)
+        if path is None:
+            return None
+        if body not in self._ego_body_models:
+            self._ego_body_models[body] = self._load_mesh_model(path, body)
+        return self._ego_body_models[body]
 
     def _load_follow_vehicle_texture(self) -> None:
         if self._follow_vehicle_texture is not None:
@@ -3596,7 +3621,10 @@ class ClusterUiRenderer:
         )
 
     def _draw_vehicle_model(self, vehicle: VehicleBox) -> None:
-        if self._vehicle_model is None:
+        model = self._vehicle_model
+        if not vehicle.source:   # only the ego vehicle has no detection source
+            model = self._ego_body_model() or model
+        if model is None:
             return
         yaw_deg = math.degrees(math.atan2(-vehicle.forward_x, vehicle.forward_y))
         position = rl.Vector3(vehicle.center.x, vehicle.center.y, 0.035)
@@ -3606,7 +3634,7 @@ class ClusterUiRenderer:
             rl.rl_disable_backface_culling()
             alpha = int(92 + 163 * clamp(vehicle.confidence, 0.0, 1.0))
             tint = rl_color(vehicle.body_color) if vehicle.source == "radarPoint" else rl_color(WHITE, alpha)
-            rl.draw_model_ex(self._vehicle_model, position, rotation_axis, yaw_deg, scale, tint)
+            rl.draw_model_ex(model, position, rotation_axis, yaw_deg, scale, tint)
         finally:
             rl.rl_enable_backface_culling()
 
@@ -6916,17 +6944,26 @@ class ClusterUiRenderer:
         label = 'eGPU' if state.egpu_active else state.external_compute_label
         if not label:
             return
+        # Append the model round trip: green below 50 ms, amber above, red when results stop
+        color = GREEN
+        if state.external_compute_connected is False:
+            label, color = f"{label} 끊김", RED
+        elif state.external_compute_latency_ms is not None:
+            label = f"{label} {state.external_compute_latency_ms:.0f}ms"
+            color = GREEN if state.external_compute_latency_ms < 50.0 else AMBER
         width = max(EGPU_STATUS_W, len(label) * EGPU_STATUS_FONT_SIZE * 0.7 + 16)
+        # Grow leftward only so a longer label never covers the lead distance text on the right
+        right = EGPU_STATUS_CENTER_X + EGPU_STATUS_W * 0.5
         rect = rl.Rectangle(
-            EGPU_STATUS_CENTER_X - width * 0.5,
+            right - width,
             TOP_STATUS_CENTER_Y - EGPU_STATUS_H * 0.5,
             width,
             EGPU_STATUS_H,
         )
         rl.draw_rectangle_rounded(rect, 0.35, 8, rl_color((0, 0, 0), 150))
-        rl.draw_rectangle_rounded_lines_ex(rect, 0.35, 8, 2.0, rl_color(GREEN))
-        self._draw_text(label, EGPU_STATUS_CENTER_X, TOP_STATUS_CENTER_Y + 1.0,
-                        EGPU_STATUS_FONT_SIZE, GREEN, anchor="center")
+        rl.draw_rectangle_rounded_lines_ex(rect, 0.35, 8, 2.0, rl_color(color))
+        self._draw_text(label, right - width * 0.5, TOP_STATUS_CENTER_Y + 1.0,
+                        EGPU_STATUS_FONT_SIZE, color, anchor="center")
 
     def _draw_drive_status_box(
         self,
@@ -7412,15 +7449,17 @@ class ClusterUiRenderer:
 
         energy_value = state.fuel_gauge
         if energy_value is not None:
+            hydrogen = state.energy_gauge_label == "H2"
             self._draw_level_gauge(
                 gauge_center_x,
                 SIDE_GAUGE_LOWER_TOP,
                 SIDE_GAUGE_LOWER_BOTTOM,
                 gauge_width,
                 clamp(energy_value, 0.0, 1.0),
-                state.energy_gauge_label,
+                "수소" if hydrogen else state.energy_gauge_label,
                 GREEN if energy_value > 0.15 else RED,
                 outline,
+                sub_text=f"{state.range_km}km" if hydrogen and state.range_km is not None else None,
             )
 
     def _draw_steering_output_block(self, state: ClusterUiState) -> None:
@@ -7479,6 +7518,32 @@ class ClusterUiRenderer:
                 AMBER if urea_value <= 0.15 else BLUE,
                 outline,
             )
+        elif state.traction_battery_soc is not None:
+            # FCEVs have no DEF tank; show the traction battery and regen level in that slot
+            soc = clamp(state.traction_battery_soc, 0.0, 1.0)
+            self._draw_level_gauge(
+                gauge_center_x,
+                SIDE_GAUGE_LOWER_TOP,
+                SIDE_GAUGE_LOWER_BOTTOM,
+                gauge_width,
+                soc,
+                "배터리",
+                AMBER if soc <= 0.2 else BLUE,
+                outline,
+            )
+            if state.regen_level is not None:
+                # Below the gauge would overlap the TPMS diagram, so draw inside it
+                self._draw_text_with_stroke(
+                    f"회생{state.regen_level}",
+                    gauge_center_x,
+                    (SIDE_GAUGE_LOWER_TOP + SIDE_GAUGE_LOWER_BOTTOM) * 0.5,
+                    16,
+                    WHITE,
+                    (5, 9, 12),
+                    2,
+                    anchor="center",
+                    cache=False,
+                )
 
     def _side_gauge_outline(self, state: ClusterUiState) -> tuple[int, int, int, int]:
         if self._current_theme().is_dark or cluster_camera_view_is_road_camera(state.camera_view_mode):
@@ -7518,6 +7583,7 @@ class ClusterUiRenderer:
         label: str,
         color: tuple[int, int, int],
         outline: tuple[int, int, int, int],
+        sub_text: str | None = None,
     ) -> None:
         gauge_x = center_x - width * 0.5
         self._rounded_rect(gauge_x, top, width, bottom - top, 18, (0, 0, 0, 0), outline, 2)
@@ -7538,6 +7604,18 @@ class ClusterUiRenderer:
             anchor="center",
             cache=True,
         )
+        if sub_text:
+            self._draw_text_with_stroke(
+                sub_text,
+                center_x,
+                bottom + SIDE_GAUGE_LABEL_OFFSET + 21,
+                17,
+                WHITE,
+                (5, 9, 12),
+                2,
+                anchor="center",
+                cache=False,
+            )
 
     def _turn_signal_lights(self, state: ClusterUiState) -> tuple[bool, bool]:
         now = time.perf_counter()

@@ -501,8 +501,17 @@ class ClusterUiState:
     steering_output_normalized: float | None = None
     steering_output_kind: Literal["angle", "torque"] | None = None
     fuel_gauge: float | None = None
-    energy_gauge_label: Literal["fuel", "battery"] = "fuel"
+    energy_gauge_label: Literal["fuel", "battery", "H2"] = "fuel"
     urea_gauge: float | None = None
+    # FCEV only: cluster distance-to-empty, traction battery state of charge (0..1), regen level
+    range_km: int | None = None
+    traction_battery_soc: float | None = None
+    regen_level: int | None = None
+    # External model computer (Jetson) round-trip time; None when not measured
+    external_compute_latency_ms: float | None = None
+    external_compute_connected: bool | None = None
+    # 3D ego vehicle mesh: "default" (cybertruck) or a car-specific body such as "nexo"
+    vehicle_body: str = "default"
     ev_mode_valid: bool = False
     ev_mode_active: bool = False
     cruise_override_kph: float | None = None
