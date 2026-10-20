@@ -144,6 +144,7 @@ class OpenpilotLiveSource:
         self.params: Any | None = None
         self.params_memory: Any | None = None
         self._energy_gauge_label = "fuel"
+        self._vehicle_body = "default"
         self._max_lateral_accel = DEFAULT_MAX_LATERAL_ACCEL
         self._next_debug_param_read_t = 0.0
         self._custom_steer_ratio: float | None = None
@@ -183,6 +184,7 @@ class OpenpilotLiveSource:
             self.params = Params()
             self.params_memory = Params("/dev/shm/params")
             self._energy_gauge_label = self._resolve_energy_gauge_label()
+            self._vehicle_body = self._resolve_vehicle_body()
             self._max_lateral_accel = self._resolve_max_lateral_accel()
             self._load_cached_car_params()
             self._load_cached_calibration()
@@ -228,9 +230,27 @@ class OpenpilotLiveSource:
             car_params = self.messaging.log_from_bytes(car_params_bytes, car.CarParams)
             if car_params.brand == "hyundai" and car_params.flags & HyundaiFlags.EV.value:
                 return "battery"
+            if car_params.brand == "hyundai" and car_params.flags & HyundaiFlags.FCEV.value:
+                return "H2"
         except Exception:
             pass
         return "fuel"
+
+    def _resolve_vehicle_body(self) -> str:
+        """Car-specific 3D body for the ego vehicle; unknown cars keep the default mesh."""
+        if self.params is None:
+            return "default"
+        try:
+            from openpilot.cereal import car
+
+            car_params_bytes = self.params.get("CarParams")
+            if car_params_bytes:
+                car_params = self.messaging.log_from_bytes(car_params_bytes, car.CarParams)
+                if str(car_params.carFingerprint).startswith("HYUNDAI_NEXO"):
+                    return "nexo"
+        except Exception:
+            pass
+        return "default"
 
     def _resolve_max_lateral_accel(self) -> float:
         if self.params is None:
@@ -358,6 +378,18 @@ class OpenpilotLiveSource:
         if urea_gauge is None or not 0.0 < urea_gauge <= 1.0:
             urea_gauge = None
 
+        # External model computer (Jetson): modelV2 execution time includes the USB round trip.
+        # A badge without fresh modelV2 frames means the link stopped delivering results.
+        external_compute_latency_ms = None
+        external_compute_connected = None
+        if getattr(self, '_external_compute_label', '') and onroad:
+            if self._service_alive("modelV2"):
+                execution_s = safe_optional_float(self._service_data("modelV2"), "modelExecutionTime")
+                if execution_s is not None and 0.0 < execution_s < 1.0:
+                    external_compute_latency_ms = execution_s * 1000.0
+            else:
+                external_compute_connected = False
+
         steering_output = None
         steering_output_normalized = None
         steering_output_kind = None
@@ -462,6 +494,9 @@ class OpenpilotLiveSource:
             alert=self._live_cluster_alert(state.alert, onroad),
             egpu_active=getattr(self, "_egpu_active", False),
             external_compute_label=getattr(self, '_external_compute_label', ''),
+            external_compute_latency_ms=external_compute_latency_ms,
+            external_compute_connected=external_compute_connected,
+            vehicle_body=getattr(self, '_vehicle_body', 'default'),
             external_nav_active=external_nav_active,
             vehicle_navi_available=vehicle_navi_available,
             speed_limit_kph=speed_limit_kph,
