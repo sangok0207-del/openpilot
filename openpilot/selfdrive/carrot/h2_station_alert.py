@@ -32,6 +32,9 @@ STATIONS_MAX_AGE_S = 7 * 86400
 HUD_SHOW_S = 60          # panel stays on the cluster this long after ignition
 WAIT_FOR_DATA_S = 180    # give GPS/fuel this long before using the last known position
 DEFAULT_THRESHOLD = 100  # owner asked for the panel and Telegram on every ignition
+INFO_PATH = "/dev/shm/h2_info.json"
+TANK_KG = 6.33           # Nexo usable hydrogen at 100 %
+MIN_USED_PCT = 1.0       # hide economy until at least 1 % (two 0.5 % steps) is used
 MAX_ATTEMPTS = 5
 RETRY_S = 30
 
@@ -146,12 +149,59 @@ def load_pos() -> tuple[float, float] | None:
     return None
 
 
+class TripEconomy:
+  """km/kg since ignition: integrated vEgo over hydrogen used (0x511 has 0.5 % steps)."""
+  def __init__(self):
+    self.reset()
+
+  def reset(self):
+    self.start_pct = None
+    self.km = 0.0
+
+  def update(self, v_ego: float, dt: float, fuel: float) -> float | None:
+    if fuel <= 0:
+      return None
+    pct = fuel * 100
+    if self.start_pct is None or pct > self.start_pct + 1.0:  # first reading or refuelled
+      self.start_pct, self.km = pct, 0.0
+    self.km += max(0.0, v_ego) * dt / 1000.0
+    used_kg = (self.start_pct - pct) / 100 * TANK_KG
+    if self.start_pct - pct < MIN_USED_PCT or used_kg <= 0:
+      return None
+    return self.km / used_kg
+
+
+class RangeReader:
+  """Cluster distance-to-empty, CLU13 (0x50C) CF_Clu_DTE: bit 24, 10 bits, km."""
+  def __init__(self):
+    self.sock = messaging.sub_sock("can", conflate=True)
+
+  def read(self) -> int | None:
+    for _ in range(40):
+      msg = messaging.recv_one_or_none(self.sock)
+      if msg is not None:
+        for c in msg.can:
+          if c.address == 0x50C and c.src == 0 and len(c.dat) >= 5:
+            return c.dat[3] | ((c.dat[4] & 0x3) << 8)
+      time.sleep(0.01)
+    return None
+
+
+def write_info(info: dict) -> None:
+  with open(INFO_PATH + ".tmp", "w", encoding="utf-8") as f:
+    json.dump(info, f)
+  os.replace(INFO_PATH + ".tmp", INFO_PATH)
+
+
 def main() -> None:
   try:
     os.nice(19)
   except OSError:
     pass
   sm = messaging.SubMaster(["deviceState", "carState", "gpsLocation"])
+  economy, range_reader = TripEconomy(), RangeReader()
+  econ = range_km = None
+  last_t = info_at = 0.0
   started_prev = False
   started_t = 0.0
   done = True
@@ -159,12 +209,23 @@ def main() -> None:
   attempts, retry_at, saved_at = 0, 0.0, 0.0
   write_hud(None)
   while True:
-    sm.update(1000)
+    time.sleep(0.2)
+    sm.update(0)
     now = time.monotonic()
     started = bool(sm["deviceState"].started)
     if started and not started_prev:
       started_t, done, attempts, retry_at = now, False, 0, 0.0
+      economy.reset()
     started_prev = started
+
+    if started:
+      cs = sm["carState"]
+      econ = economy.update(cs.vEgo, min(now - last_t, 1.0) if last_t else 0.0, cs.fuelGauge)
+      if now - info_at >= 2.0:
+        range_km = range_reader.read() or range_km
+        write_info({"range_km": range_km, "econ": round(econ, 1) if econ else None})
+        info_at = now
+    last_t = now
 
     gps = sm["gpsLocation"]
     pos = (gps.latitude, gps.longitude) if sm.recv_frame["gpsLocation"] > 0 and gps.hasFix and abs(gps.latitude) > 1 else None

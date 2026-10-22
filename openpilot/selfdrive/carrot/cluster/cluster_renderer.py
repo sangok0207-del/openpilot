@@ -7557,6 +7557,19 @@ class ClusterUiRenderer:
                 outline,
                 sub_text=f"{state.range_km}km" if hydrogen and state.range_km is not None else None,
             )
+            if hydrogen:
+                economy = getattr(state, "h2_economy", None)
+                self._draw_text_with_stroke(
+                    f"{economy:.0f}km/kg" if economy else "--km/kg",
+                    gauge_center_x,
+                    SIDE_GAUGE_LOWER_BOTTOM + SIDE_GAUGE_LABEL_OFFSET + 42,
+                    17,
+                    (120, 220, 255),
+                    (5, 9, 12),
+                    2,
+                    anchor="center",
+                    cache=False,
+                )
 
     def _draw_steering_output_block(self, state: ClusterUiState) -> None:
         theme = self._current_theme()

@@ -514,6 +514,8 @@ class ClusterUiState:
     vehicle_body: str = "default"
     # Low-hydrogen panel from h2_station_alert: {"h2": %, "stations": [{name, km, wait, congestion, price}]}
     h2_station: dict | None = None
+    # Trip hydrogen economy (km/kg) computed by h2_station_alert since ignition
+    h2_economy: float | None = None
     ev_mode_valid: bool = False
     ev_mode_active: bool = False
     cruise_override_kph: float | None = None
