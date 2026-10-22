@@ -4127,7 +4127,8 @@ class ClusterUiRenderer:
         rl.rl_push_matrix()
         rl.rl_scalef(sx, sy, 1.0)
         try:
-            amber = (255, 170, 40)
+            low = float(info.get("h2", 0)) <= 40
+            amber = (255, 170, 40) if low else (80, 200, 255)
             rl.draw_rectangle(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT, rl_color((6, 8, 12), 250))
             self._rounded_rect(24, 24, 496, DESIGN_HEIGHT - 48, 28, (20, 24, 32))
             self._draw_text("수소", 60, 80, 54, (170, 180, 195))
@@ -4136,7 +4137,7 @@ class ClusterUiRenderer:
             self._rounded_rect(60, 330, 420, 45, 22, (40, 46, 58))
             if pct > 0:
                 self._rounded_rect(60, 330, max(45.0, 420 * pct), 45, 22, amber)
-            self._draw_text("충전 필요", 60, 412, 40, amber)
+            self._draw_text("충전 필요" if low else "충분", 60, 412, 40, amber)
             self._draw_text("가까운 충전소 (운영 중만)", 560, 60, 46, (230, 235, 240))
             stations = info.get("stations") or []
             if not stations:
