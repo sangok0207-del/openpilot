@@ -498,6 +498,8 @@ class OpenpilotLiveSource:
             external_compute_connected=external_compute_connected,
             vehicle_body=getattr(self, '_vehicle_body', 'default'),
             h2_station=self._h2_station_info(now),
+            range_km=self._h2_info(now).get("range_km"),
+            h2_economy=self._h2_info(now).get("econ"),
             external_nav_active=external_nav_active,
             vehicle_navi_available=vehicle_navi_available,
             speed_limit_kph=speed_limit_kph,
@@ -532,6 +534,24 @@ class OpenpilotLiveSource:
                 info = None
             self._h2_station = info
         return getattr(self, "_h2_station", None)
+
+    def _h2_info(self, now: float) -> dict:
+        # Range (cluster DTE) and trip km/kg from h2_station_alert, same pseudo-param path.
+        if now >= getattr(self, "_h2_info_next_read", 0.0):
+            self._h2_info_next_read = now + 1.0
+            info = {}
+            try:
+                raw = self.params.get("H2Info") if self.params is not None else None
+                if raw:
+                    data = json.loads(raw)
+                    if isinstance(data, dict):
+                        rng, econ = data.get("range_km"), data.get("econ")
+                        info = {"range_km": int(rng) if isinstance(rng, (int, float)) and 0 < rng < 1023 else None,
+                                "econ": float(econ) if isinstance(econ, (int, float)) and 0 < econ < 1000 else None}
+            except Exception:
+                info = {}
+            self._h2_info_cache = info
+        return getattr(self, "_h2_info_cache", {})
 
     def _live_cluster_alert(self, current_alert: ClusterAlert | None, onroad: bool) -> ClusterAlert | None:
         now = time.monotonic()

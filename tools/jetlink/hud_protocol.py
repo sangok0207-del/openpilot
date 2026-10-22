@@ -13,6 +13,7 @@ HUD_CAPABILITY = 'carrot_hud_v1'
 MAX_HUD_BYTES = 512 * 1024
 HUD_PACKET = Path('/dev/shm/carrot-jetlink-hud.packet')
 H2_STATION_PATH = Path('/dev/shm/h2_station.json')
+H2_INFO_PATH = Path('/dev/shm/h2_info.json')
 HEADER = struct.Struct('<d')
 SERVICES = ('carState', 'carParams', 'modelV2', 'radarState', 'liveTracks', 'longitudinalPlan',
             'lateralPlan', 'controlsState', 'selfdriveState', 'carControl', 'carOutput', 'deviceState',
@@ -157,11 +158,12 @@ class SnapshotBuilder:
             self.settings[key] = base64.b64encode(value if isinstance(value, bytes) else str(value).encode()).decode()
         except Exception:
           pass
-      # Not a real Param: the hydrogen station panel written by h2_station_alert.
-      try:
-        self.settings['H2StationInfo'] = base64.b64encode(H2_STATION_PATH.read_bytes()[:4096]).decode()
-      except OSError:
-        pass
+      # Not real Params: the hydrogen station panel and range/economy written by h2_station_alert.
+      for key, path in (('H2StationInfo', H2_STATION_PATH), ('H2Info', H2_INFO_PATH)):
+        try:
+          self.settings[key] = base64.b64encode(path.read_bytes()[:4096]).decode()
+        except OSError:
+          pass
       self.next_params = now + 1
     device_badge = badge()
     record = {'version': 1, 'sent': now, 'events': self.cached, 'params': self.settings,
