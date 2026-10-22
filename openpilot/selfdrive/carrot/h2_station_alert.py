@@ -31,7 +31,7 @@ NAV_URL = "https://sangok0207-del.github.io/h2-go/?lat={lat}&lng={lng}&name={nam
 STATIONS_MAX_AGE_S = 7 * 86400
 HUD_SHOW_S = 60          # panel stays on the cluster this long after ignition
 WAIT_FOR_DATA_S = 180    # give GPS/fuel this long before using the last known position
-DEFAULT_THRESHOLD = 40
+DEFAULT_THRESHOLD = 100  # owner asked for the panel and Telegram on every ignition
 MAX_ATTEMPTS = 5
 RETRY_S = 30
 
