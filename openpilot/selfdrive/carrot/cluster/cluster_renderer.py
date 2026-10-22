@@ -7503,7 +7503,7 @@ class ClusterUiRenderer:
                 gauge_width,
                 clamp(energy_value, 0.0, 1.0),
                 "수소" if hydrogen else state.energy_gauge_label,
-                GREEN if energy_value > 0.15 else RED,
+                GREEN if energy_value > (0.40 if hydrogen else 0.15) else AMBER if energy_value > 0.15 else RED,
                 outline,
                 sub_text=f"{state.range_km}km" if hydrogen and state.range_km is not None else None,
             )
