@@ -373,6 +373,7 @@ class OpenpilotLiveSource:
         fuel_gauge = safe_optional_float(car_state, "fuelGauge")
         if fuel_gauge is None or not 0.0 < fuel_gauge <= 1.0:
             fuel_gauge = None
+        self._refresh_car_identity(now)
         energy_gauge_label = "battery" if bool(safe_get(car_state, "charging", False)) else self._energy_gauge_label
         urea_gauge = safe_optional_float(car_state, "ureaGauge")
         if urea_gauge is None or not 0.0 < urea_gauge <= 1.0:
@@ -534,6 +535,17 @@ class OpenpilotLiveSource:
                 info = None
             self._h2_station = info
         return getattr(self, "_h2_station", None)
+
+    def _refresh_car_identity(self, now: float) -> None:
+        # A Jetson HUD can start before the vehicle snapshot carries CarParams; retry
+        # the H2 gauge label and Nexo body until they resolve instead of keeping defaults.
+        if self._energy_gauge_label != "fuel" and self._vehicle_body != "default":
+            return
+        if now < getattr(self, "_car_identity_next_t", 0.0):
+            return
+        self._car_identity_next_t = now + 2.0
+        self._energy_gauge_label = self._resolve_energy_gauge_label()
+        self._vehicle_body = self._resolve_vehicle_body()
 
     def _h2_info(self, now: float) -> dict:
         # Range (cluster DTE) and trip km/kg from h2_station_alert, same pseudo-param path.
