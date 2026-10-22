@@ -497,6 +497,7 @@ class OpenpilotLiveSource:
             external_compute_latency_ms=external_compute_latency_ms,
             external_compute_connected=external_compute_connected,
             vehicle_body=getattr(self, '_vehicle_body', 'default'),
+            h2_station=self._h2_station_info(now),
             external_nav_active=external_nav_active,
             vehicle_navi_available=vehicle_navi_available,
             speed_limit_kph=speed_limit_kph,
@@ -514,6 +515,23 @@ class OpenpilotLiveSource:
             cruise_override_label=cruise_override_label,
             cruise_override_color_mode=cruise_override_color_mode,
         )
+
+    def _h2_station_info(self, now: float) -> dict | None:
+        # Jetlink snapshots carry the h2_station_alert panel as a pseudo-param; plain
+        # Params raise for the unknown key, which simply means no panel.
+        if now >= getattr(self, "_h2_station_next_read", 0.0):
+            self._h2_station_next_read = now + 1.0
+            info = None
+            try:
+                raw = self.params.get("H2StationInfo") if self.params is not None else None
+                if raw:
+                    info = json.loads(raw)
+                    if not isinstance(info, dict) or not isinstance(info.get("stations"), list):
+                        info = None
+            except Exception:
+                info = None
+            self._h2_station = info
+        return getattr(self, "_h2_station", None)
 
     def _live_cluster_alert(self, current_alert: ClusterAlert | None, onroad: bool) -> ClusterAlert | None:
         now = time.monotonic()

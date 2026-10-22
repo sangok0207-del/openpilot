@@ -187,6 +187,8 @@ procs = [
   PythonProcess("cweb_push", "openpilot.selfdrive.carrot.cweb_push", always_run, enabled=not PC),
   # Sends finished qlogs to the owner's upload server; idle unless a private server is set.
   PythonProcess("carrot_auto_upload", "openpilot.selfdrive.carrot.auto_upload", always_run, enabled=not PC, restart_if_crash=True),
+  # Low-hydrogen nearest-station alert (HUD + Telegram); idle without /data/h2_alert.env.
+  PythonProcess("h2_station_alert", "openpilot.selfdrive.carrot.h2_station_alert", always_run, enabled=not PC, restart_if_crash=True),
   PythonProcess("carrot_cluster", "openpilot.selfdrive.carrot.cluster_autorun", enable_cluster_hud, restart_if_crash=True),
 
   #Xiaoge data broadcaster (conditional on ShareData param)

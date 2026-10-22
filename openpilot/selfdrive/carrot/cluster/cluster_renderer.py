@@ -1523,6 +1523,7 @@ class ClusterUiRenderer:
         self._profile_add("render.hud", profile_stage)
         profile_stage = self._profile_start()
         self._draw_alert_overlay(getattr(state, "alert", None))
+        self._draw_h2_station_overlay(getattr(state, "h2_station", None))
         self._profile_add("render.alert", profile_stage)
 
     def _prepare_trip_report_cache(self, state: ClusterUiState, now: float | None = None) -> None:
@@ -4064,6 +4065,50 @@ class ClusterUiRenderer:
                     title, panel_center_x, center_y, title_size, title_color,
                     CLUSTER_ALERT_TEXT_STROKE, 4, anchor="center", cache=True,
                 )
+        finally:
+            rl.rl_pop_matrix()
+
+    def _draw_h2_station_overlay(self, info: dict | None) -> None:
+        """Full-width low-hydrogen panel: tank % on the left, nearest open stations on the right."""
+        if not info:
+            return
+        sx = self.width / DESIGN_WIDTH
+        sy = self.height / DESIGN_HEIGHT
+        rl.rl_push_matrix()
+        rl.rl_scalef(sx, sy, 1.0)
+        try:
+            amber = (255, 170, 40)
+            rl.draw_rectangle(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT, rl_color((6, 8, 12), 250))
+            self._rounded_rect(24, 24, 496, DESIGN_HEIGHT - 48, 28, (20, 24, 32))
+            self._draw_text("수소", 60, 80, 54, (170, 180, 195))
+            self._draw_text(f"{int(info.get('h2', 0))}%", 60, 225, 170, amber)
+            pct = max(0.0, min(1.0, float(info.get("h2", 0)) / 100.0))
+            self._rounded_rect(60, 330, 420, 45, 22, (40, 46, 58))
+            if pct > 0:
+                self._rounded_rect(60, 330, max(45.0, 420 * pct), 45, 22, amber)
+            self._draw_text("충전 필요", 60, 412, 40, amber)
+            self._draw_text("가까운 충전소 (운영 중만)", 560, 60, 46, (230, 235, 240))
+            stations = info.get("stations") or []
+            if not stations:
+                self._draw_text("주변에 운영 중인 충전소 없음", 600, 200, 52, (255, 120, 100))
+            congestion = {"여유": (90, 220, 120), "보통": (255, 200, 60), "혼잡": (255, 90, 80)}
+            for i, s in enumerate(stations[:3]):
+                y = 100 + i * 122
+                self._rounded_rect(560, y, DESIGN_WIDTH - 584, 110, 22, (20, 24, 32))
+                name = str(s.get("name", ""))
+                for word in ("수소충전소", "하이버스", "하이넷"):
+                    name = name.replace(word, "")
+                if "(" in name:
+                    name = name[:name.index("(")]
+                name, _ = self._fit_alert_text(" ".join(name.split()), 58.0, 540.0, 40.0)
+                mid = y + 55
+                self._draw_text(str(i + 1), 590, mid, 64, (120, 130, 145))
+                self._draw_text(name, 660, mid, 58, (240, 244, 248))
+                self._draw_text(f"{float(s.get('km', 0)):.1f}km", 1230, mid, 58, (80, 200, 255))
+                self._draw_text(f"대기{int(s.get('wait', 0))}", 1460, mid, 58,
+                                congestion.get(str(s.get("congestion", "")), (200, 200, 200)))
+                price = s.get("price")
+                self._draw_text(f"{int(price):,}" if price else "-", 1660, mid, 50, (200, 205, 215))
         finally:
             rl.rl_pop_matrix()
 
