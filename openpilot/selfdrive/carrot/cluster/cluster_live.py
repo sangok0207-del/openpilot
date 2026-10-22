@@ -222,15 +222,19 @@ class OpenpilotLiveSource:
             return "fuel"
         try:
             from openpilot.cereal import car
-            from opendbc.car.hyundai.values import HyundaiFlags
+            try:
+                from opendbc.car.hyundai.values import HyundaiFlags
+                ev_flag, fcev_flag = HyundaiFlags.EV.value, HyundaiFlags.FCEV.value
+            except ImportError:  # the Jetson HUD runtime ships without opendbc
+                ev_flag, fcev_flag = 2 ** 11, 2 ** 25
 
             car_params_bytes = self.params.get("CarParams")
             if not car_params_bytes:
                 return "fuel"
             car_params = self.messaging.log_from_bytes(car_params_bytes, car.CarParams)
-            if car_params.brand == "hyundai" and car_params.flags & HyundaiFlags.EV.value:
+            if car_params.brand == "hyundai" and car_params.flags & ev_flag:
                 return "battery"
-            if car_params.brand == "hyundai" and car_params.flags & HyundaiFlags.FCEV.value:
+            if car_params.brand == "hyundai" and car_params.flags & fcev_flag:
                 return "H2"
         except Exception:
             pass
