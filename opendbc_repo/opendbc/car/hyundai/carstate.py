@@ -516,6 +516,9 @@ class CarState(CarStateBase):
     if cp.ts_nanos["EMS21"]["SCR_UREA_LEVEL"] > 0:
       ret.ureaGauge = float(np.clip(cp.vl["EMS21"]["SCR_UREA_LEVEL"] / 100.0, 0.0, 1.0))
 
+    if self.CP.flags & HyundaiFlags.FCEV and cp.ts_nanos["FCEV_HYDROGEN"]["HYDROGEN_LEVEL"] > 0:
+      ret.fuelGauge = float(np.clip(cp.vl["FCEV_HYDROGEN"]["HYDROGEN_LEVEL"] / 100.0, 0.0, 1.0))
+
     ret.wheelSpeeds = self.get_wheel_speeds(
       cp.vl["WHL_SPD11"]["WHL_SPD_FL"],
       cp.vl["WHL_SPD11"]["WHL_SPD_FR"],
@@ -1643,9 +1646,13 @@ class CarState(CarStateBase):
     if CP.flags & HyundaiFlags.CANFD:
       return self.get_can_parsers_canfd(CP)
 
+    # EMS21 carries SCR_UREA_LEVEL on diesel platforms. NaN frequency makes
+    # it optional, so gasoline/EV platforms do not fail CAN validity.
+    pt_messages = [("EMS21", math.nan)]
+    if CP.flags & HyundaiFlags.FCEV:
+      # 0x511 hydrogen tank level (Nexo); optional so a missing frame never faults CAN.
+      pt_messages.append(("FCEV_HYDROGEN", math.nan))
     return {
-      # EMS21 carries SCR_UREA_LEVEL on diesel platforms. NaN frequency makes
-      # it optional, so gasoline/EV platforms do not fail CAN validity.
-      Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], [("EMS21", math.nan)], 0),
+      Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], pt_messages, 0),
       Bus.cam: CANParser(DBC[CP.carFingerprint][Bus.pt], [], 2),
     }
