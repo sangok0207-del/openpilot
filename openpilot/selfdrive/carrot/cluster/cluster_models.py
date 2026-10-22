@@ -512,6 +512,8 @@ class ClusterUiState:
     external_compute_connected: bool | None = None
     # 3D ego vehicle mesh: "default" (cybertruck) or a car-specific body such as "nexo"
     vehicle_body: str = "default"
+    # Low-hydrogen panel from h2_station_alert: {"h2": %, "stations": [{name, km, wait, congestion, price}]}
+    h2_station: dict | None = None
     ev_mode_valid: bool = False
     ev_mode_active: bool = False
     cruise_override_kph: float | None = None
