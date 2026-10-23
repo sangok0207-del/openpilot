@@ -518,6 +518,8 @@ class ClusterUiState:
     h2_economy: float | None = None
     # Nexo drive mode from cluster frame 0x52C: "NORMAL", "ECO" or "ECO+"
     drive_mode: str | None = None
+    # OEM AutoHold is holding the car (carState.brakeHoldActive)
+    auto_hold: bool = False
     ev_mode_valid: bool = False
     ev_mode_active: bool = False
     cruise_override_kph: float | None = None
