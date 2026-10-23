@@ -567,7 +567,7 @@ class OpenpilotLiveSource:
                         regen, mode = data.get("regen"), data.get("mode")
                         info = {"range_km": int(rng) if isinstance(rng, (int, float)) and 0 < rng < 1023 else None,
                                 "econ": float(econ) if isinstance(econ, (int, float)) and 0 < econ < 1000 else None,
-                                "regen": int(regen) if isinstance(regen, int) and 0 <= regen <= 3 else None,
+                                "regen": int(regen) if isinstance(regen, int) and 0 <= regen <= 4 else None,
                                 "mode": mode if mode in ("NORMAL", "ECO", "ECO+") else None}
             except Exception:
                 info = {}
