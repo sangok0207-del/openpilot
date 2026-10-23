@@ -1523,6 +1523,7 @@ class ClusterUiRenderer:
         self._profile_add("render.hud", profile_stage)
         profile_stage = self._profile_start()
         self._draw_alert_overlay(getattr(state, "alert", None))
+        self._draw_auto_hold_label(state)
         self._draw_h2_station_overlay(getattr(state, "h2_station", None))
         self._profile_add("render.alert", profile_stage)
 
@@ -4065,6 +4066,22 @@ class ClusterUiRenderer:
                     title, panel_center_x, center_y, title_size, title_color,
                     CLUSTER_ALERT_TEXT_STROKE, 4, anchor="center", cache=True,
                 )
+        finally:
+            rl.rl_pop_matrix()
+
+    def _draw_auto_hold_label(self, state: ClusterUiState) -> None:
+        """'AUTO HOLD' under the ego car while the OEM AutoHold holds the vehicle."""
+        if not getattr(state, "auto_hold", False):
+            return
+        sx = self.width / DESIGN_WIDTH
+        sy = self.height / DESIGN_HEIGHT
+        rl.rl_push_matrix()
+        rl.rl_scalef(sx, sy, 1.0)
+        try:
+            center_x = self._driving_panel_offset_design_x() + CAMERA_BACKGROUND_W * 0.5
+            self._draw_text_with_stroke(
+                "AUTO HOLD", center_x, DESIGN_HEIGHT - 26, 30, GREEN, (5, 9, 12), 3, anchor="center", cache=True
+            )
         finally:
             rl.rl_pop_matrix()
 

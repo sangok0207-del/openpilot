@@ -507,6 +507,7 @@ class OpenpilotLiveSource:
             h2_economy=self._h2_info(now).get("econ"),
             regen_level=self._h2_info(now).get("regen"),
             drive_mode=self._h2_info(now).get("mode"),
+            auto_hold=bool(safe_get(car_state, "brakeHoldActive", False)),
             external_nav_active=external_nav_active,
             vehicle_navi_available=vehicle_navi_available,
             speed_limit_kph=speed_limit_kph,
