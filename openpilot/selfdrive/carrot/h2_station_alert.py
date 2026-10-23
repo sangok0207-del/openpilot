@@ -173,19 +173,32 @@ class TripEconomy:
 
 
 class RangeReader:
-  """Cluster distance-to-empty, CLU13 (0x50C) CF_Clu_DTE: bit 24, 10 bits, km."""
+  """Cluster frames on bus 0, sampled from a conflated can socket:
+  CLU13 (0x50C) CF_Clu_DTE bit 24 len 10 = range km;
+  0x52C byte1 >> 4 = regen paddle level 0-3, byte2 = drive mode (0 NORMAL, 64 ECO, 96 ECO+),
+  both found 2026-10-23 by stepping the paddles and mode switch while parked."""
+  MODES = {0: "NORMAL", 64: "ECO", 96: "ECO+"}
+
   def __init__(self):
     self.sock = messaging.sub_sock("can", conflate=True)
 
-  def read(self) -> int | None:
-    for _ in range(40):
+  def read(self) -> dict:
+    out = {}
+    for _ in range(60):
       msg = messaging.recv_one_or_none(self.sock)
       if msg is not None:
         for c in msg.can:
-          if c.address == 0x50C and c.src == 0 and len(c.dat) >= 5:
-            return c.dat[3] | ((c.dat[4] & 0x3) << 8)
+          if c.src != 0:
+            continue
+          if c.address == 0x50C and len(c.dat) >= 5:
+            out["range_km"] = c.dat[3] | ((c.dat[4] & 0x3) << 8)
+          elif c.address == 0x52C and len(c.dat) >= 3:
+            out["regen"] = (c.dat[1] >> 4) & 0x3
+            out["mode"] = self.MODES.get(c.dat[2] & 0x60)
+        if "range_km" in out and "regen" in out:
+          break
       time.sleep(0.01)
-    return None
+    return out
 
 
 def write_info(info: dict) -> None:
@@ -201,7 +214,8 @@ def main() -> None:
     pass
   sm = messaging.SubMaster(["deviceState", "carState", "gpsLocation"])
   economy, range_reader = TripEconomy(), RangeReader()
-  econ = range_km = None
+  econ = None
+  cluster: dict = {}
   last_t = info_at = 0.0
   started_prev = False
   started_t = 0.0
@@ -223,8 +237,8 @@ def main() -> None:
       cs = sm["carState"]
       econ = economy.update(cs.vEgo, min(now - last_t, 1.0) if last_t else 0.0, cs.fuelGauge)
       if now - info_at >= 2.0:
-        range_km = range_reader.read() or range_km
-        write_info({"range_km": range_km, "econ": round(econ, 1) if econ else None})
+        cluster.update(range_reader.read())
+        write_info({**cluster, "econ": round(econ, 1) if econ else None})
         info_at = now
     last_t = now
 

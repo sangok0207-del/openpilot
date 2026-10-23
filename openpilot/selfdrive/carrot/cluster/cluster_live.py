@@ -505,6 +505,8 @@ class OpenpilotLiveSource:
             h2_station=self._h2_station_info(now),
             range_km=self._h2_info(now).get("range_km"),
             h2_economy=self._h2_info(now).get("econ"),
+            regen_level=self._h2_info(now).get("regen"),
+            drive_mode=self._h2_info(now).get("mode"),
             external_nav_active=external_nav_active,
             vehicle_navi_available=vehicle_navi_available,
             speed_limit_kph=speed_limit_kph,
@@ -562,8 +564,11 @@ class OpenpilotLiveSource:
                     data = json.loads(raw)
                     if isinstance(data, dict):
                         rng, econ = data.get("range_km"), data.get("econ")
+                        regen, mode = data.get("regen"), data.get("mode")
                         info = {"range_km": int(rng) if isinstance(rng, (int, float)) and 0 < rng < 1023 else None,
-                                "econ": float(econ) if isinstance(econ, (int, float)) and 0 < econ < 1000 else None}
+                                "econ": float(econ) if isinstance(econ, (int, float)) and 0 < econ < 1000 else None,
+                                "regen": int(regen) if isinstance(regen, int) and 0 <= regen <= 3 else None,
+                                "mode": mode if mode in ("NORMAL", "ECO", "ECO+") else None}
             except Exception:
                 info = {}
             self._h2_info_cache = info

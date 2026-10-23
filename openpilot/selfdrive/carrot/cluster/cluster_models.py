@@ -516,6 +516,8 @@ class ClusterUiState:
     h2_station: dict | None = None
     # Trip hydrogen economy (km/kg) computed by h2_station_alert since ignition
     h2_economy: float | None = None
+    # Nexo drive mode from cluster frame 0x52C: "NORMAL", "ECO" or "ECO+"
+    drive_mode: str | None = None
     ev_mode_valid: bool = False
     ev_mode_active: bool = False
     cruise_override_kph: float | None = None
