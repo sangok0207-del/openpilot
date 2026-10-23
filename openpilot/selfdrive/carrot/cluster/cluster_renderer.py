@@ -7570,6 +7570,21 @@ class ClusterUiRenderer:
                     anchor="center",
                     cache=False,
                 )
+                mode = getattr(state, "drive_mode", None)
+                regen = state.regen_level
+                if mode or regen is not None:
+                    parts = [mode or "", f"회생{regen}" if regen is not None else ""]
+                    self._draw_text_with_stroke(
+                        " ".join(p for p in parts if p),
+                        gauge_center_x,
+                        SIDE_GAUGE_LOWER_BOTTOM + SIDE_GAUGE_LABEL_OFFSET + 63,
+                        17,
+                        (110, 230, 140),
+                        (5, 9, 12),
+                        2,
+                        anchor="center",
+                        cache=False,
+                    )
 
     def _draw_steering_output_block(self, state: ClusterUiState) -> None:
         theme = self._current_theme()
