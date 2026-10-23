@@ -7515,8 +7515,8 @@ class ClusterUiRenderer:
                 self._draw_text_with_stroke(
                     f"{economy:.0f}" if economy else "--",
                     econ_x,
-                    econ_mid - 12,
-                    40,
+                    econ_mid - 16,
+                    58,
                     RED,
                     (5, 9, 12),
                     3,
@@ -7524,7 +7524,7 @@ class ClusterUiRenderer:
                     cache=False,
                 )
                 self._draw_text_with_stroke(
-                    "km/kg", econ_x, econ_mid + 24, 18, RED, (5, 9, 12), 2, anchor="right", cache=True
+                    "km/kg", econ_x, econ_mid + 32, 22, RED, (5, 9, 12), 2, anchor="right", cache=True
                 )
 
     def _draw_steering_output_block(self, state: ClusterUiState) -> None:
