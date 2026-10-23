@@ -34,7 +34,8 @@ WAIT_FOR_DATA_S = 180    # give the fuel gauge this long to appear
 WAIT_FOR_GPS_S = 20      # then fall back to the last known position (parking garages block GPS)
 DEFAULT_THRESHOLD = 100  # owner asked for the panel and Telegram on every ignition
 INFO_PATH = "/dev/shm/h2_info.json"
-TANK_KG = 6.33           # Nexo usable hydrogen at 100 %
+TANK_KG = 6.9            # kg per 100 % of the 0x511 gauge; calibrated against the cluster trip km/kg
+                         # (2026-10-23: 51.5 km, cluster 124 vs 136 at the nominal 6.33). TANK_KG in h2_alert.env overrides.
 MIN_USED_PCT = 1.0       # hide economy until at least 1 % (two 0.5 % steps) is used
 MAX_ATTEMPTS = 5
 RETRY_S = 30
@@ -158,6 +159,10 @@ class TripEconomy:
   def reset(self):
     self.start_pct = None
     self.km = 0.0
+    try:
+      self.tank_kg = float(load_config().get("TANK_KG") or TANK_KG)
+    except ValueError:
+      self.tank_kg = TANK_KG
 
   def update(self, v_ego: float, dt: float, fuel: float) -> float | None:
     if fuel <= 0:
@@ -166,7 +171,7 @@ class TripEconomy:
     if self.start_pct is None or pct > self.start_pct + 1.0:  # first reading or refuelled
       self.start_pct, self.km = pct, 0.0
     self.km += max(0.0, v_ego) * dt / 1000.0
-    used_kg = (self.start_pct - pct) / 100 * TANK_KG
+    used_kg = (self.start_pct - pct) / 100 * self.tank_kg
     if self.start_pct - pct < MIN_USED_PCT or used_kg <= 0:
       return None
     return self.km / used_kg
