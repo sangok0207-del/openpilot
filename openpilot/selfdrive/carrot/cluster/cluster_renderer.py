@@ -7558,17 +7558,23 @@ class ClusterUiRenderer:
                 sub_text=f"{state.range_km}km" if hydrogen and state.range_km is not None else None,
             )
             if hydrogen:
+                # Trip km/kg, large, to the left of the hydrogen gauge
                 economy = getattr(state, "h2_economy", None)
+                econ_x = gauge_center_x - gauge_width * 0.5 - 14
+                econ_mid = (SIDE_GAUGE_LOWER_TOP + SIDE_GAUGE_LOWER_BOTTOM) * 0.5
                 self._draw_text_with_stroke(
-                    f"{economy:.0f}km/kg" if economy else "--km/kg",
-                    gauge_center_x,
-                    SIDE_GAUGE_LOWER_BOTTOM + SIDE_GAUGE_LABEL_OFFSET + 42,
-                    17,
-                    (120, 220, 255),
+                    f"{economy:.0f}" if economy else "--",
+                    econ_x,
+                    econ_mid - 12,
+                    40,
+                    RED,
                     (5, 9, 12),
-                    2,
-                    anchor="center",
+                    3,
+                    anchor="right",
                     cache=False,
+                )
+                self._draw_text_with_stroke(
+                    "km/kg", econ_x, econ_mid + 24, 18, RED, (5, 9, 12), 2, anchor="right", cache=True
                 )
 
     def _draw_steering_output_block(self, state: ClusterUiState) -> None:
