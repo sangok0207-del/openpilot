@@ -193,7 +193,7 @@ class RangeReader:
           if c.address == 0x50C and len(c.dat) >= 5:
             out["range_km"] = c.dat[3] | ((c.dat[4] & 0x3) << 8)
           elif c.address == 0x52C and len(c.dat) >= 3:
-            out["regen"] = (c.dat[1] >> 4) & 0x3
+            out["regen"] = (c.dat[1] >> 4) & 0x7
             out["mode"] = self.MODES.get(c.dat[2] & 0x60)
         if "range_km" in out and "regen" in out:
           break

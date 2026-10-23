@@ -7570,21 +7570,6 @@ class ClusterUiRenderer:
                     anchor="center",
                     cache=False,
                 )
-                mode = getattr(state, "drive_mode", None)
-                regen = state.regen_level
-                if mode or regen is not None:
-                    parts = [mode or "", f"회생{regen}" if regen is not None else ""]
-                    self._draw_text_with_stroke(
-                        " ".join(p for p in parts if p),
-                        gauge_center_x,
-                        SIDE_GAUGE_LOWER_BOTTOM + SIDE_GAUGE_LABEL_OFFSET + 63,
-                        17,
-                        (110, 230, 140),
-                        (5, 9, 12),
-                        2,
-                        anchor="center",
-                        cache=False,
-                    )
 
     def _draw_steering_output_block(self, state: ClusterUiState) -> None:
         theme = self._current_theme()
@@ -7668,6 +7653,33 @@ class ClusterUiRenderer:
                     anchor="center",
                     cache=False,
                 )
+        elif state.regen_level is not None or getattr(state, "drive_mode", None):
+            self._draw_regen_gauge(gauge_center_x, gauge_width, state.regen_level,
+                                   getattr(state, "drive_mode", None), outline)
+
+    def _draw_regen_gauge(self, center_x: float, width: float, level: int | None,
+                          mode: str | None, outline: tuple[int, int, int, int]) -> None:
+        """Nexo regen paddle level as 4 stacked cells (level N lights N cells) with the drive mode below."""
+        top, bottom = SIDE_GAUGE_LOWER_TOP, SIDE_GAUGE_LOWER_BOTTOM
+        gauge_x = center_x - width * 0.5
+        self._rounded_rect(gauge_x, top, width, bottom - top, 18, (0, 0, 0, 0), outline, 2)
+        cells, gap = 4, 5.0
+        inner_top, inner_bottom = top + 8, bottom - 8
+        cell_h = (inner_bottom - inner_top - gap * (cells - 1)) / cells
+        lit = 0 if level is None else int(clamp(level, 0, cells))
+        color = BLUE
+        for i in range(cells):
+            y = inner_bottom - (i + 1) * cell_h - i * gap
+            fill = color if i < lit else (40, 46, 58)
+            self._rounded_rect(gauge_x + 8, y, width - 16, cell_h, 6, fill)
+        self._draw_text_with_stroke(
+            f"회생 {level}" if level is not None else "회생", center_x, top - 16, 17, color, (5, 9, 12), 2, anchor="center"
+        )
+        if mode:
+            mode_color = {"NORMAL": WHITE, "ECO": (110, 230, 140), "ECO+": (60, 210, 120)}.get(mode, WHITE)
+            self._draw_text_with_stroke(
+                mode, center_x, bottom + SIDE_GAUGE_LABEL_OFFSET, 17, mode_color, (5, 9, 12), 2, anchor="center"
+            )
 
     def _side_gauge_outline(self, state: ClusterUiState) -> tuple[int, int, int, int]:
         if self._current_theme().is_dark or cluster_camera_view_is_road_camera(state.camera_view_mode):
