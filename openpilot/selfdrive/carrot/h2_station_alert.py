@@ -30,7 +30,8 @@ LIVE_URL = "https://apis.data.go.kr/B552532/h2nbiz_3/currentInfo?serviceKey={}&n
 NAV_URL = "https://sangok0207-del.github.io/h2-go/?lat={lat}&lng={lng}&name={name}&app="
 STATIONS_MAX_AGE_S = 7 * 86400
 HUD_SHOW_S = 60          # panel stays on the cluster this long after ignition
-WAIT_FOR_DATA_S = 180    # give GPS/fuel this long before using the last known position
+WAIT_FOR_DATA_S = 180    # give the fuel gauge this long to appear
+WAIT_FOR_GPS_S = 20      # then fall back to the last known position (parking garages block GPS)
 DEFAULT_THRESHOLD = 100  # owner asked for the panel and Telegram on every ignition
 INFO_PATH = "/dev/shm/h2_info.json"
 TANK_KG = 6.33           # Nexo usable hydrogen at 100 %
@@ -251,7 +252,7 @@ def main() -> None:
     if not key or (fuel <= 0 and waited < WAIT_FOR_DATA_S):
       done = not key
       continue
-    if pos is None and waited < WAIT_FOR_DATA_S:
+    if pos is None and waited < WAIT_FOR_GPS_S:
       continue
     done = True
     h2 = int(round(fuel * 100))
