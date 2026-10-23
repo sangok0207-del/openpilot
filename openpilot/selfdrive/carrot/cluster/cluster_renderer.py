@@ -4130,7 +4130,7 @@ class ClusterUiRenderer:
         try:
             center_x = self._driving_panel_offset_design_x() + CAMERA_BACKGROUND_W * 0.5
             self._draw_text_with_stroke(
-                "AUTO HOLD", center_x, DESIGN_HEIGHT - 26, 30, GREEN, (5, 9, 12), 3, anchor="center", cache=True
+                "AUTO HOLD", center_x, DESIGN_HEIGHT - 26, 30, (57, 255, 20), (5, 9, 12), 3, anchor="center", cache=True
             )
         finally:
             rl.rl_pop_matrix()
