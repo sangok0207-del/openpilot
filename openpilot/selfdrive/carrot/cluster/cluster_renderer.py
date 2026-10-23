@@ -7659,11 +7659,11 @@ class ClusterUiRenderer:
 
     def _draw_regen_gauge(self, center_x: float, width: float, level: int | None,
                           mode: str | None, outline: tuple[int, int, int, int]) -> None:
-        """Nexo regen paddle level as 4 stacked cells (level N lights N cells) with the drive mode below."""
+        """Nexo regen paddle level (0-3) as 3 stacked cells (level N lights N cells) with the drive mode below."""
         top, bottom = SIDE_GAUGE_LOWER_TOP, SIDE_GAUGE_LOWER_BOTTOM
         gauge_x = center_x - width * 0.5
         self._rounded_rect(gauge_x, top, width, bottom - top, 18, (0, 0, 0, 0), outline, 2)
-        cells, gap = 4, 5.0
+        cells, gap = 3, 5.0
         inner_top, inner_bottom = top + 8, bottom - 8
         cell_h = (inner_bottom - inner_top - gap * (cells - 1)) / cells
         lit = 0 if level is None else int(clamp(level, 0, cells))
