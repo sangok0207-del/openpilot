@@ -7522,13 +7522,17 @@ class ClusterUiRenderer:
                 "수소" if hydrogen else state.energy_gauge_label,
                 GREEN if energy_value > (0.40 if hydrogen else 0.15) else AMBER if energy_value > 0.15 else RED,
                 outline,
-                sub_text=f"{state.range_km}km" if hydrogen and state.range_km is not None else None,
             )
             if hydrogen:
                 # Trip km/kg, large, to the left of the hydrogen gauge
                 economy = getattr(state, "h2_economy", None)
                 econ_x = gauge_center_x - gauge_width * 0.5 - 14
                 econ_mid = (SIDE_GAUGE_LOWER_TOP + SIDE_GAUGE_LOWER_BOTTOM) * 0.5
+                # Driving range (km), blue, above the economy number
+                if state.range_km is not None:
+                    self._draw_text_with_stroke(
+                        f"{state.range_km}km", econ_x, econ_mid - 74, 40, BLUE, (5, 9, 12), 3, anchor="right", cache=False
+                    )
                 self._draw_text_with_stroke(
                     f"{economy:.0f}" if economy else "--",
                     econ_x,
