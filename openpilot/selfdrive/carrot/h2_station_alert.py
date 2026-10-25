@@ -157,6 +157,7 @@ class TripEconomy:
     self.reset()
 
   def reset(self):
+    self.first_pct = None  # level at ignition/refuel; the baseline waits for its first 0.5 % step
     self.start_pct = None
     self.km = 0.0
     try:
@@ -168,8 +169,15 @@ class TripEconomy:
     if fuel <= 0:
       return None
     pct = fuel * 100
-    if self.start_pct is None or pct > self.start_pct + 1.0:  # first reading or refuelled
-      self.start_pct, self.km = pct, 0.0
+    if self.first_pct is None or pct > (self.start_pct if self.start_pct is not None else self.first_pct) + 1.0:
+      self.first_pct, self.start_pct, self.km = pct, None, 0.0  # ignition or refuelled
+    if self.start_pct is None:
+      # Start counting at the first step edge: the opening reading can sit anywhere inside a 0.5 % band,
+      # and a fresh fill stays on its first step for tens of km (10-25: 21.9 km on 94.5 % -> 265 km/kg
+      # shown vs 111 on the cluster; counting from the edge gives 113).
+      if pct < self.first_pct:
+        self.start_pct, self.km = pct, 0.0
+      return None
     self.km += max(0.0, v_ego) * dt / 1000.0
     used_kg = (self.start_pct - pct) / 100 * self.tank_kg
     if self.start_pct - pct < MIN_USED_PCT or used_kg <= 0:
