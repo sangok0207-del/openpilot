@@ -7529,18 +7529,19 @@ class ClusterUiRenderer:
                 econ_x = gauge_center_x - gauge_width * 0.5 - 14
                 econ_mid = (SIDE_GAUGE_LOWER_TOP + SIDE_GAUGE_LOWER_BOTTOM) * 0.5
                 # Driving range (km), neon blue, left of the accel gauge, same size as economy
+                # Positions swapped (owner 10-25): economy top, range bottom
+                range_mid = (SIDE_GAUGE_TOP + SIDE_GAUGE_BOTTOM) * 0.5
                 if state.range_km is not None:
-                    range_mid = (SIDE_GAUGE_TOP + SIDE_GAUGE_BOTTOM) * 0.5
                     self._draw_text_with_stroke(
-                        f"{state.range_km}", econ_x, range_mid - 4, 58, (0, 140, 255), (5, 9, 12), 3, anchor="right", cache=False
+                        f"{state.range_km}", econ_x, econ_mid - 16, 58, (0, 140, 255), (5, 9, 12), 3, anchor="right", cache=False
                     )
                     self._draw_text_with_stroke(
-                        "km", econ_x, range_mid + 44, 22, (0, 140, 255), (5, 9, 12), 2, anchor="right", cache=True
+                        "km", econ_x, econ_mid + 32, 22, (0, 140, 255), (5, 9, 12), 2, anchor="right", cache=True
                     )
                 self._draw_text_with_stroke(
                     f"{economy:.0f}" if economy else "--",
                     econ_x,
-                    econ_mid - 16,
+                    range_mid - 4,
                     58,
                     RED,
                     (5, 9, 12),
@@ -7549,7 +7550,7 @@ class ClusterUiRenderer:
                     cache=False,
                 )
                 self._draw_text_with_stroke(
-                    "km/kg", econ_x, econ_mid + 32, 22, RED, (5, 9, 12), 2, anchor="right", cache=True
+                    "km/kg", econ_x, range_mid + 44, 22, RED, (5, 9, 12), 2, anchor="right", cache=True
                 )
 
     def _draw_steering_output_block(self, state: ClusterUiState) -> None:
