@@ -62,6 +62,7 @@ from cluster_config import (
     MAX_SPEED_KPH,
     RADAR_TO_CAMERA_M,
     RED,
+    TESLA_VEHICLE_TINT,
     TEXT,
     VEHICLE_NAVI,
     VEHICLE_LENGTH_M,
@@ -3484,6 +3485,11 @@ class ClusterUiRenderer:
         return points, point_count
 
     def _draw_vehicle(self, vehicle: VehicleBox) -> None:
+        if self._vehicle_model is not None and self._theme.name == "tesla" and vehicle.source != "radarPoint":
+            # Tesla style: every detected vehicle is a grey car model, never a box or marker
+            self._draw_vehicle_shadow(vehicle)
+            self._draw_vehicle_model(vehicle)
+            return
         source_marker = vehicle.source.startswith("modelV2") or vehicle.source in ("radarState", "radarPoint", "cornerRadar")
         use_model = (
             self._vehicle_model is not None
@@ -3680,7 +3686,12 @@ class ClusterUiRenderer:
         try:
             rl.rl_disable_backface_culling()
             alpha = int(92 + 163 * clamp(vehicle.confidence, 0.0, 1.0))
-            tint = rl_color(vehicle.body_color) if vehicle.source == "radarPoint" else rl_color(WHITE, alpha)
+            if vehicle.source == "radarPoint":
+                tint = rl_color(vehicle.body_color)
+            elif vehicle.source and self._theme.name == "tesla":
+                tint = rl_color(TESLA_VEHICLE_TINT, max(alpha, 200))
+            else:
+                tint = rl_color(WHITE, alpha)
             rl.draw_model_ex(model, position, rotation_axis, yaw_deg, scale, tint)
         finally:
             rl.rl_enable_backface_culling()
