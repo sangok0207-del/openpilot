@@ -3416,6 +3416,16 @@ def profile_scene_add_elapsed(profile_add: ProfileAdd | None, name: str, elapsed
         profile_add(name, elapsed_ms)
 
 
+def tesla_lane_color(color: Color, theme: ClusterTheme) -> Color:
+    """Tesla theme draws ordinary (blue) lane lines white; red/amber BSD warnings keep their colour."""
+    if theme.name != "tesla":
+        return color
+    r, g, b = color[0], color[1], color[2]
+    if b > r + 40 and b >= g:
+        return 232, 236, 242, color[3] if len(color) > 3 else 235
+    return color
+
+
 def lane_highlight_color(route_mode: bool) -> Color:
     alpha = LANE_HIGHLIGHT_ROUTE_ALPHA if route_mode else LANE_HIGHLIGHT_ALPHA
     return LANE_HIGHLIGHT_COLOR[0], LANE_HIGHLIGHT_COLOR[1], LANE_HIGHLIGHT_COLOR[2], alpha
@@ -3590,6 +3600,17 @@ def build_cluster_scene(
 
     profile_stage = profile_scene_start(profile_add)
     highlight_lanes: list[MeshStrip] = []
+    if theme.name == "tesla":
+        # Tesla style: a grey road surface under the ego lane and both neighbours
+        for floor_offset in (-1.0, 0.0, 1.0):
+            floor_strip = lane_floor_strip(
+                state, floor_offset, rgba(theme.road), lane_width_m, road_start_m, road_end_m, road_steps, route_mode, 0.002
+            ) or strip_between_offsets(
+                floor_offset - 0.5, floor_offset + 0.5, state.steering, lane_width_m,
+                road_start_m, road_end_m, road_steps, rgba(theme.road), 0.002,
+            )
+            if floor_strip is not None:
+                highlight_lanes.append(floor_strip)
     if state.highlight_lane_offset is not None and highlight_lane_lit:
         highlight_strip = lane_floor_strip(
             state,
@@ -3623,7 +3644,7 @@ def build_cluster_scene(
             ),
             (
                 marking.width,
-                rgba(lane_marking_color_for_state(marking, bsd_marking_offsets)),
+                tesla_lane_color(rgba(lane_marking_color_for_state(marking, bsd_marking_offsets)), theme),
                 LANE_MARKING_HEIGHT_M,
             ),
         )

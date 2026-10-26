@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 DESIGN_WIDTH = 1920
 DESIGN_HEIGHT = 480
@@ -47,6 +47,7 @@ class ClusterTheme:
 CLUSTER_THEME_AUTO = 0
 CLUSTER_THEME_DARK = 1
 CLUSTER_THEME_LIGHT = 2
+CLUSTER_THEME_TESLA = 3
 CLUSTER_ENCODER_AUTO = 0
 CLUSTER_ENCODER_JPEG = 1
 CLUSTER_ENCODER_HARDWARE = 2
@@ -168,11 +169,35 @@ DARK_CLUSTER_THEME = ClusterTheme(
     default_vehicle=(84, 96, 110),
 )
 
+# Tesla-style visualization: blue-grey night ground, soft grey road, white lanes,
+# a wide translucent blue path and light-grey car models for every detected vehicle.
+TESLA_CLUSTER_THEME = replace(
+    DARK_CLUSTER_THEME,
+    name="tesla",
+    bg=(14, 17, 22),
+    panel_bg=(22, 26, 33),
+    faint=(70, 78, 90),
+    road=(58, 64, 74),
+    road_edge=(214, 220, 228),
+    lane_marking_border=(14, 17, 22, 150),
+    road_edge_backing=(14, 17, 22, 120),
+    path_shadow=(0, 0, 0, 60),
+    path_uncertainty=(47, 140, 255, 60),
+    path_body=(47, 140, 255, 150),
+    path_highlight=(150, 200, 255, 200),
+    gauge_bg=(22, 26, 33),
+    route_panel_bg=(22, 26, 33),
+    primary_vehicle=(184, 190, 200),
+    model_vehicle=(166, 173, 184),
+    default_vehicle=(150, 158, 170),
+)
+TESLA_VEHICLE_TINT = (186, 192, 202)
+
 
 def normalize_cluster_theme_mode(value: object) -> str:
     if isinstance(value, str):
         normalized = value.strip().lower()
-        if normalized in ("auto", "dark", "light"):
+        if normalized in ("auto", "dark", "light", "tesla"):
             return normalized
         try:
             value = int(normalized)
@@ -182,6 +207,8 @@ def normalize_cluster_theme_mode(value: object) -> str:
         return "dark"
     if value == CLUSTER_THEME_LIGHT:
         return "light"
+    if value == CLUSTER_THEME_TESLA:
+        return "tesla"
     return "auto"
 
 
@@ -503,6 +530,8 @@ def current_cluster_theme(mode: object = "auto", now: float | None = None) -> Cl
         return DARK_CLUSTER_THEME
     if normalized == "light":
         return LIGHT_CLUSTER_THEME
+    if normalized == "tesla":
+        return TESLA_CLUSTER_THEME
 
     local_hour = time.localtime(now).tm_hour if now is not None else time.localtime().tm_hour
     if local_hour >= AUTO_DARK_START_HOUR or local_hour < AUTO_LIGHT_START_HOUR:
