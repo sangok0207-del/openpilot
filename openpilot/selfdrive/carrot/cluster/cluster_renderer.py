@@ -3137,8 +3137,9 @@ class ClusterUiRenderer:
                 self._draw_strip(strip)
             self._profile_add("draw_scene.highlight_lanes", profile_stage)
             profile_stage = self._profile_start()
-            for strip in scene.road_edges:
-                self._draw_strip(strip)
+            if self._theme.name != "tesla":  # Tesla view: no white road-edge lines (owner 10-27)
+                for strip in scene.road_edges:
+                    self._draw_strip(strip)
             self._profile_add("draw_scene.road_edges", profile_stage)
             profile_stage = self._profile_start()
             for strip in scene.lane_markings:
