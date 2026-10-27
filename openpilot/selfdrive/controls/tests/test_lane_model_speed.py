@@ -90,7 +90,7 @@ def test_normal_profiles_preserve_original_gate_sequence():
     assert guard.update(actual, start, end) == (count > 20)
 
 
-@pytest.mark.parametrize('actual', [1.0, 5.0, 8.0, 11.0])
+@pytest.mark.parametrize('actual', [1.0, 5.0, 8.0, 11.0, 15.0])
 def test_low_speed_predicted_stop_keeps_lane_mode(actual):
   # Stop-and-go behind a lead car: the model predicts slowing to a stop.
   guard = LaneModelSpeedGuard(recovery_frames=20)

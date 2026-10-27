@@ -4,8 +4,9 @@ import math
 MODEL_SPEED_RATIO_MIN = 0.7
 # Below this speed a predicted slowdown (end < start * ratio) is normal stop-and-go
 # behind a lead car. Blocking lane MPC on it toggled lane/laneless several times a
-# minute in traffic, so the deceleration check only applies above it.
-DECEL_CHECK_MIN_SPEED = 40.0 / 3.6
+# minute in traffic, so the deceleration check only applies above it. At 40 km/h the
+# 40-60 km/h band still toggled ~5 times a minute, so the threshold is 60 km/h.
+DECEL_CHECK_MIN_SPEED = 60.0 / 3.6
 
 
 class LaneModelSpeedGuard:
