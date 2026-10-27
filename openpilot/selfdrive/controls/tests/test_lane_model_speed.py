@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from openpilot.selfdrive.controls.lib.lane_model_speed import LaneModelSpeedGuard
+from openpilot.selfdrive.controls.lib.lane_model_speed import DECEL_CHECK_MIN_SPEED, LaneModelSpeedGuard
 
 
 def warmed_guard():
@@ -86,5 +86,25 @@ def test_normal_profiles_preserve_original_gate_sequence():
     actual = 5 + (i % 40)
     start = actual * 0.95
     end = start * (0.5 if i % 71 == 0 else 1.1)
-    count = 0 if end < start * 0.7 else count + 1
+    count = 0 if (end < start * 0.7 and actual >= DECEL_CHECK_MIN_SPEED) else count + 1
     assert guard.update(actual, start, end) == (count > 20)
+
+
+@pytest.mark.parametrize('actual', [1.0, 5.0, 8.0, 11.0])
+def test_low_speed_predicted_stop_keeps_lane_mode(actual):
+  # Stop-and-go behind a lead car: the model predicts slowing to a stop.
+  guard = LaneModelSpeedGuard(recovery_frames=20)
+  for _ in range(21):
+    guard.update(actual, actual, actual)
+  assert all(guard.update(actual, actual, 0.0) for _ in range(40))
+
+
+def test_low_speed_collapsed_start_still_blocks():
+  assert not warmed_guard().update(10.0, 5.0, 5.0)
+
+
+def test_deceleration_check_applies_from_threshold():
+  guard = LaneModelSpeedGuard(recovery_frames=20)
+  for _ in range(21):
+    guard.update(DECEL_CHECK_MIN_SPEED, 12.0, 12.0)
+  assert not guard.update(DECEL_CHECK_MIN_SPEED, 12.0, 8.0)

@@ -2,6 +2,10 @@ import math
 
 
 MODEL_SPEED_RATIO_MIN = 0.7
+# Below this speed a predicted slowdown (end < start * ratio) is normal stop-and-go
+# behind a lead car. Blocking lane MPC on it toggled lane/laneless several times a
+# minute in traffic, so the deceleration check only applies above it.
+DECEL_CHECK_MIN_SPEED = 40.0 / 3.6
 
 
 class LaneModelSpeedGuard:
@@ -17,6 +21,7 @@ class LaneModelSpeedGuard:
     # end/start deceleration check. Do not run lane MPC on that shortened time
     # horizon while the vehicle is still travelling substantially faster.
     valid = valid and model_start >= v_ego * MODEL_SPEED_RATIO_MIN
-    valid = valid and model_end >= model_start * MODEL_SPEED_RATIO_MIN
+    if v_ego >= DECEL_CHECK_MIN_SPEED:
+      valid = valid and model_end >= model_start * MODEL_SPEED_RATIO_MIN
     self.valid_frames = min(self.valid_frames + 1, self.recovery_frames + 1) if valid else 0
     return self.valid_frames > self.recovery_frames
