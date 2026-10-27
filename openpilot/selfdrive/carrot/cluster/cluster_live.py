@@ -546,9 +546,9 @@ class OpenpilotLiveSource:
     def _refresh_car_identity(self, now: float) -> None:
         # A Jetson HUD can start before the vehicle snapshot carries CarParams; retry
         # the H2 gauge label and Nexo body until they resolve instead of keeping defaults.
-        if self._energy_gauge_label != "fuel" and self._vehicle_body != "default":
+        if self._energy_gauge_label != "fuel" and getattr(self, "_vehicle_body", "default") != "default":
             return
-        if now < getattr(self, "_car_identity_next_t", 0.0):
+        if getattr(self, "params", None) is None or now < getattr(self, "_car_identity_next_t", 0.0):
             return
         self._car_identity_next_t = now + 2.0
         self._energy_gauge_label = self._resolve_energy_gauge_label()
