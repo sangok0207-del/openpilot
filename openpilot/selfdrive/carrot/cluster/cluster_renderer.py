@@ -7271,8 +7271,15 @@ class ClusterUiRenderer:
         # P R N D
         gear = str(state.gear_text or "").strip().upper()[:1]
         for i, ch in enumerate("PRND"):
-            color = (57, 255, 20) if ch == gear else (92, 101, 115)  # current gear fluorescent green (owner 10-27)
-            self._draw_text_with_stroke(ch, 62.0 + i * 44.0, 360.0, 34, color, stroke, 1, anchor="left", cache=True)
+            cx = 78.0 + i * 50.0
+            if ch == gear:
+                # current gear in a fluorescent green box like the C3X screen (owner 10-27)
+                box = rl.Rectangle(cx - 22.0, 360.0 - 24.0, 44.0, 48.0)
+                rl.draw_rectangle_rounded(box, 0.25, 8, rl_color((57, 255, 20)))
+                rl.draw_rectangle_rounded_lines_ex(box, 0.25, 8, 2.0, rl_color((200, 255, 190)))
+                self._draw_text_with_stroke(ch, cx, 361.0, 38, WHITE, stroke, 2, anchor="center", cache=True)
+            else:
+                self._draw_text_with_stroke(ch, cx, 361.0, 34, (92, 101, 115), stroke, 1, anchor="center", cache=True)
         # set speed and following gap
         if self._cruise_set_visible(state):
             self._draw_text_with_stroke(f"SET {self._cruise_set_speed_text(state)}", 62.0, 408.0, 24, theme.muted, stroke, 1, anchor="left")
