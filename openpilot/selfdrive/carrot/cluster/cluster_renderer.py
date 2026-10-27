@@ -7271,7 +7271,7 @@ class ClusterUiRenderer:
         # P R N D
         gear = str(state.gear_text or "").strip().upper()[:1]
         for i, ch in enumerate("PRND"):
-            color = WHITE if ch == gear else (92, 101, 115)
+            color = (57, 255, 20) if ch == gear else (92, 101, 115)  # current gear fluorescent green (owner 10-27)
             self._draw_text_with_stroke(ch, 62.0 + i * 44.0, 360.0, 34, color, stroke, 1, anchor="left", cache=True)
         # set speed and following gap
         if self._cruise_set_visible(state):
