@@ -81,8 +81,6 @@ from cluster_simulator import ClusterSimulator, RandomInputSource
 from cluster_system_monitor import ClusterProcessCoreUsageSampler, NetworkAddressProvider
 from cluster_usb_display import TuringUsbDisplay, find_supported_usb_product, product_id_for_hud_mode, _set_cluster_hud_connected
 from cluster_usb_pipeline import AsyncJpegUsbPipeline
-from cluster_wifi_display import create_display
-from cluster_wifi_protocol import load_config as load_wifi_config, select_codec as select_wifi_codec
 from openpilot.common.display_scheduling import DisplayScheduler
 from openpilot.selfdrive.controls.lib.cutin_alert import CutinAlertCandidate, CutinAlertTracker
 
@@ -690,6 +688,7 @@ def run_demo(
     hud_encoder_watch: int | None,
     language: str | None,
     is_metric: bool | None,
+    usb_h264_ffmpeg_threads: int = 0,
 ) -> None:
     scheduler = DisplayScheduler(4, enabled=TICI)
     scheduler.update(False, force=True)
@@ -729,7 +728,7 @@ def run_demo(
         auto_enabled=usb_brightness_auto_enabled,
     )
     if output_mode in ("usb", "both"):
-        usb_display = create_display(
+        usb_display = TuringUsbDisplay(
             brightness=initial_usb_brightness,
             display_fps=usb_display_fps,
             jpeg_quality=usb_jpeg_quality,
@@ -1072,6 +1071,7 @@ def run_demo(
                 usb_h264_dump,
                 usb_h264_debug,
                 usb_h264_diagnose_interval_s,
+                ffmpeg_threads=usb_h264_ffmpeg_threads,
             )
             profile_stage = time.perf_counter()
             h264_pipeline.start()
@@ -2116,6 +2116,13 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--usb-h264-ffmpeg-threads",
+        type=int,
+        choices=range(17),
+        default=0,
+        help="libx264 encoder and conversion threads (0: automatic; 1: minimum CPU concurrency).",
+    )
+    parser.add_argument(
         "--usb-h264-device",
         default=DEFAULT_H264_DEVICE,
         help=f"V4L2 hardware encoder device path. Default: {DEFAULT_H264_DEVICE}.",
@@ -2428,6 +2435,7 @@ def parse_args() -> argparse.Namespace:
     args.fps_from_cli = args.fps is not None
     args.usb_codec_from_cli = option_present(raw_args, "--usb-codec")
     args.usb_h264_backend_from_cli = option_present(raw_args, "--usb-h264-backend")
+    args.usb_h264_rate_control_from_cli = option_present(raw_args, "--usb-h264-rate-control")
     args.usb_h264_ffmpeg_encoder_from_cli = option_present(raw_args, "--usb-h264-ffmpeg-encoder")
     if args.fps is None:
         args.fps = DEFAULT_FPS
@@ -2527,8 +2535,7 @@ def resolve_usb_output_rate(args: argparse.Namespace):
 
 def main(*, exit_on_error: bool = True) -> None:
     args = parse_args()
-    wifi_config = load_wifi_config() if args.output in ("usb", "both") else None
-    if args.output in ("usb", "both") and not TICI and wifi_config is None:
+    if args.output in ("usb", "both") and not TICI:
         expected_product_id = product_id_for_hud_mode(args.cluster_hud_mode) if args.cluster_hud_mode is not None else None
         if find_supported_usb_product(expected_product_id) is None:
             print(
@@ -2537,33 +2544,9 @@ def main(*, exit_on_error: bool = True) -> None:
             )
             args.output = "window"
     encoder_source = apply_cluster_encoder_param(args)
-    if wifi_config is not None:
-        jpeg_fallback = (args.usb_codec_from_cli and args.usb_codec == "jpeg" and
-                         args.cluster_hud_encoder == CLUSTER_ENCODER_AUTO)
-        args.usb_codec = select_wifi_codec(wifi_config, jpeg_fallback=jpeg_fallback)
-        args.usb_jpeg_quality = int(wifi_config.get("quality", 50))
-        args.usb_async = args.usb_codec == "jpeg"
-        encoder_source = f"S3 Wi-Fi {args.usb_codec.upper()}"
-        if args.usb_codec == "h264":
-            if args.usb_h264_bitrate == "auto":
-                args.usb_h264_bitrate = "1M"
-            args.usb_h264_gop = 10
-            args.usb_h264_wait_ack = False
-            args.usb_h264_soft_ack = False
-            if args.usb_h264_diagnose_interval == 0:
-                args.usb_h264_diagnose_interval = 10.0
     if args.usb_async and args.usb_codec != "jpeg":
         raise SystemExit("--usb-async only supports --usb-codec jpeg")
     target_fps, fps_source, usb_fps_reader, usb_display_fps, usb_display_fps_auto = resolve_usb_output_rate(args)
-    if wifi_config is not None:
-        target_fps = float(wifi_config.get("fps", 15))
-        fps_source = "S3 Wi-Fi"
-        # S3 sends over Wi-Fi rather than sharing C4's USB link with the eGPU.
-        usb_fps_reader = ClusterUsbFpsReader(target_fps, egpu_max_fps=10.0) if TICI and args.input == "live" else None
-        if usb_fps_reader is not None:
-            target_fps = usb_fps_reader.read()
-        usb_display_fps = int(target_fps)
-        usb_display_fps_auto = usb_fps_reader is not None
     usb_h264_bitrate = resolved_usb_h264_bitrate(args.usb_h264_bitrate, target_fps, args.usb_h264_fps)
     usb_h264_bitrate_auto = args.usb_h264_bitrate.strip().lower() == "auto"
     brightness_param_reader = None
@@ -2684,6 +2667,7 @@ def main(*, exit_on_error: bool = True) -> None:
             args.cluster_hud_encoder,
             args.language,
             args.is_metric,
+            usb_h264_ffmpeg_threads=args.usb_h264_ffmpeg_threads,
         )
     except KeyboardInterrupt:
         print("\nStopped.")

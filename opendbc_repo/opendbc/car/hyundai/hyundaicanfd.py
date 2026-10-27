@@ -566,6 +566,12 @@ def create_acc_control_scc2(packer, CAN, enabled, accel_value_last, accel, stopp
   values["ZEROS_7"] = 0 if stop_controller is not None else 1
   apply_canfd_stopping(values, CS, stop_controller, accel, previous_value, jerk_u, jerk_l)
 
+  # Trial for no-lead stops: OEM SCC_ObjSta is named HUD_LEAD_INFO in this DBC.
+  # Change only the state after the final StopReq/interlocks; do not fabricate
+  # object distance/speed or latch it into RX. This is not a confirmed ESC gate.
+  if stop_controller is not None and values["ACCMode"] == 1 and values["StopReq"] == 1 and values["HUD_LEAD_INFO"] == 0:
+    values["HUD_LEAD_INFO"] = 2
+
   return packer.make_can_msg("SCC_CONTROL", CAN.ECAN, values), values["aReqValue"]
 
 def create_acc_control(packer, CAN, enabled, accel_last, accel, stopping, gas_override, set_speed, hud_control, jerk_u, jerk_l, CS,
@@ -1138,6 +1144,9 @@ def create_ccnc_messages(CP, packer, CAN, frame, CC, CS, hud_control,
         rx_counter = values.pop("COUNTER", None)
         # blinker hold: the confirmed lane change until the body is across (see _blink_hold_side)
         hold = _blink_hold_side(md, desire, create_ccnc_messages.__dict__.setdefault("_blink_hold", {}))
+        external_hold = getattr(hud_control, "physicalBlinkerHold", 0)
+        if external_hold in (1, 2, 3):
+          hold = {1:0, 2:3, 3:4}[external_hold]
         values['LEFT_BLINK_HOLD'] = 1 if hold == 3 else 0
         values['RIGHT_BLINK_HOLD'] = 1 if hold == 4 else 0
 

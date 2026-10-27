@@ -12,6 +12,8 @@ from opendbc.car.hyundai.hyundaicanfd import CanBus
 from opendbc.car.hyundai.navi_speedcam import SpeedcamPolicy
 from opendbc.car.hyundai.section_average import DISTANCE_SCALE as SECTION_DISTANCE_SCALE, SectionAverage
 from opendbc.car.hyundai.steering_touch import HyundaiSteeringTouch
+from opendbc.car.hyundai.rear_gap import rear_lane_change_blocks
+from opendbc.car.hyundai.vehicle_gps import VehicleGPS, register_vehicle_gps
 from opendbc.car.hyundai.values import HyundaiFlags, CAR, DBC, Buttons, CarControllerParams, CAMERA_SCC_CAR, HyundaiExtFlags, \
                                        EV_MODE_ACTIVE_VALUES, EV_MODE_STATUS_ADDR, EV_MODE_STATUS_DLC, EV_MODE_STATUS_MSG, \
                                        EV_MODE_STATUS_SIGNAL
@@ -212,6 +214,7 @@ class CarState(CarStateBase):
     self.mdps = None
     self.steer_touch_2af = None
     self.steering_touch = HyundaiSteeringTouch()
+    self.vehicle_gps = VehicleGPS()
     self.cruise_buttons_msg = None
     self.cam_0x362 = None
     self.cam_0x2a4 = None
@@ -692,6 +695,7 @@ class CarState(CarStateBase):
     if prev_main_buttons == 0 and self.main_buttons[-1] != 0:
       self.main_enabled = not self.main_enabled
 
+    ret.vehicleGps = self.vehicle_gps.update(cp, ret.vEgoRaw, ret.gearShifter == GearShifter.reverse)
     return ret
 
   @staticmethod
@@ -1354,6 +1358,7 @@ class CarState(CarStateBase):
     )
     ret.vEgoRaw = (ret.wheelSpeeds.fl + ret.wheelSpeeds.fr + ret.wheelSpeeds.rl + ret.wheelSpeeds.rr) / 4.
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
+    ret.vehicleGps = self.vehicle_gps.update(cp, ret.vEgoRaw, ret.gearShifter == GearShifter.reverse)
     ret.standstill = ret.wheelSpeeds.fl <= STANDSTILL_THRESHOLD and ret.wheelSpeeds.rr <= STANDSTILL_THRESHOLD
 
     ret.brakeLights = ret.brakePressed or cp.vl["TCS"]["BrakeLight"] == 1 or ret.aEgo < -0.5
@@ -1477,6 +1482,12 @@ class CarState(CarStateBase):
       ret.rightRearLongDist = self.rr_distance
       ret.leftRearLatDist = corner_max("LR_DETECT_LATERAL")
       ret.rightRearLatDist = corner_max("RR_DETECT_LATERAL")
+      if self.CP.enableBsm:
+        rear_sources = tuple(name for name, info in (
+          ("ADRV_0x1ea", self.adrv_0x1ea), ("CCNC_0x162", self.ccnc_0x162),
+        ) if info is not None)
+        ret.tbtRearInputsAvailable = bool(rear_sources)
+        _, ret.tbtRightRearBlocked = rear_lane_change_blocks(cp_cam, self.cp_bsm, rear_sources)
       corner = True
     if corner:
       raw_corner_radar_enabled = (
@@ -1630,7 +1641,7 @@ class CarState(CarStateBase):
       ]
 
     CAN = CanBus(CP)
-    pt_parser = CANParser(DBC[CP.carFingerprint][Bus.pt], msgs, CAN.ECAN)
+    pt_parser = register_vehicle_gps(CANParser(DBC[CP.carFingerprint][Bus.pt], msgs, CAN.ECAN))
     if CP.extFlags & HyundaiExtFlags.EV_MODE_STATUS_230:
       # Display-only while the signal is fleet-validated: checksum and freshness
       # gate the value without making a counter/alive fault disable controls.
@@ -1653,6 +1664,6 @@ class CarState(CarStateBase):
       # 0x511 hydrogen tank level (Nexo); optional so a missing frame never faults CAN.
       pt_messages.append(("FCEV_HYDROGEN", math.nan))
     return {
-      Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], pt_messages, 0),
+      Bus.pt: register_vehicle_gps(CANParser(DBC[CP.carFingerprint][Bus.pt], pt_messages, 0)),
       Bus.cam: CANParser(DBC[CP.carFingerprint][Bus.pt], [], 2),
     }

@@ -103,6 +103,7 @@ def test_onnx_vision_toggle_uses_existing_runtime_flag_and_first_steering_sectio
   lane_change = next(group for group in steering["groups"] if group["id"] == "STEER_LANECHANGE")
   assert onnx["id"] == "STEER_ONNX"
   detail_names = [
+    "OnnxBsdEnabled",
     "OnnxLaneThreshold", "OnnxLaneIntervalMs", "OnnxBsdThreshold",
     "OnnxBsdSmoothingMs", "OnnxBsdIntervalMs",
   ]
@@ -112,6 +113,8 @@ def test_onnx_vision_toggle_uses_existing_runtime_flag_and_first_steering_sectio
     assert by_name[name]["detail_parent"] == "ShareData"
     assert by_name[name]["detail_section"] in ("lane", "bsd")
     assert f'{{"{name}", {{PERSISTENT, INT,' in PARAMS_KEYS_PATH.read_text(encoding="utf-8")
+  bsd_enabled = by_name["OnnxBsdEnabled"]
+  assert (bsd_enabled["control"], bsd_enabled["min"], bsd_enabled["max"], bsd_enabled["default"]) == ("toggle", 0, 1, 0)
   for title in ("title", "etitle", "ctitle"):
     assert "ONNX" in vision[title]
 
@@ -440,7 +443,7 @@ def test_external_hud_brightness_and_orientation_use_catalog_controls(settings, 
     "Info left / driving right",
   ]
   screen_mode = by_name["ClusterHudScreenMode"]
-  assert (screen_mode["min"], screen_mode["max"], screen_mode["default"]) == (-1, 5, 0)
+  assert (screen_mode["min"], screen_mode["max"], screen_mode["default"]) == (-1, 7, 0)
   assert screen_mode["descr"].startswith("-1: 3D 전체화면\n0: 기본(내비/주행 리포트)")
   assert screen_mode["edescr"].startswith("-1: 3D fullscreen\n0: Default (navigation/driving report)")
   assert screen_mode["cdescr"].startswith("-1: 3D全屏\n0: 默认(导航/驾驶报告)")

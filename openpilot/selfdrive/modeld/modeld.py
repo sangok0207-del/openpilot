@@ -26,8 +26,10 @@ from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.compile_modeld import make_input_queues, WARP_INPUTS, POLICY_INPUTS
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.common.file_chunker import open_file_chunked
-from openpilot.selfdrive.modeld.camera_sync import FrameMeta, receive_camera_pair
+from openpilot.selfdrive.modeld.camera_sync import FrameMeta
+from openpilot.selfdrive.modeld.camera_gap import CameraGapTrace
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
+from openpilot.selfdrive.navigation.map_client import MapInput
 from openpilot.selfdrive.modeld.signal_shadow import ShadowClient
 from openpilot.selfdrive.modeld.helpers import (get_tg_input_devices, load_oob, modeld_pkl_path,
                                                 refresh_usbgpu_device_cache, select_vision_streams, usbgpu_compiled_path,
@@ -126,7 +128,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
 class ModelState:
   prev_desire: np.ndarray  # for tracking the rising edge of the pulse
 
-  def __init__(self, cam_w: int, cam_h: int, usbgpu: bool, pkl_path=None):
+  def __init__(self, cam_w: int, cam_h: int, usbgpu: bool, pkl_path=None, *, enable_shadow=True):
     input_devices = get_tg_input_devices(PROCESS_NAME, usbgpu)
     self.WARP_DEV, self.QUEUE_DEV = input_devices['WARP_DEV'], input_devices['QUEUE_DEV']
     jits = load_oob(open_file_chunked(pkl_path or modeld_pkl_path(usbgpu)))
@@ -146,7 +148,7 @@ class ModelState:
     self.frame_buf_params = {k: get_nv12_info(cam_w, cam_h) for k in ('img', 'big_img')}
     self.run_policy = jits['run_policy']
     self.warp = jits[(cam_w,cam_h)]
-    self.signal_shadow = ShadowClient.optional(modeld_pkl_path(False).parent / 'driving_supercombo.onnx') if not usbgpu else None
+    self.signal_shadow = ShadowClient.optional(modeld_pkl_path(False).parent / 'driving_supercombo.onnx') if enable_shadow and not usbgpu else None
 
   def slice_outputs(self, model_outputs: np.ndarray, output_slices: dict[str, slice]) -> dict[str, np.ndarray]:
     parsed_model_outputs = {k: model_outputs[np.newaxis, v] for k,v in output_slices.items()}
@@ -337,7 +339,11 @@ def main(demo=False):
   # Keep the internal-GPU model ready so a USB disconnect or runtime error does
   # not take modeld down while driving.
   phase_start = time.monotonic()
-  small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False) if model is None or USBGPU else None
+  # A standby model must not spawn a separate experimental ONNX observer that
+  # receives no live samples. Keep standby inference/warmup and fallback intact;
+  # optional comparison remains available when internal inference starts active.
+  small_model = ModelState(vipc_client_main.width, vipc_client_main.height, False,
+                           enable_shadow=not usbgpu_model_loaded) if model is None or USBGPU else None
   if usbgpu_model_loaded:
     from openpilot.selfdrive.modeld.internal_model_warmup import warm_internal_model_from_camera
     warm_internal_model_from_camera(small_model, vipc_client_main)
@@ -375,7 +381,7 @@ def main(demo=False):
 
   # messaging
   pm = PubMaster(["modelV2", "drivingModelData", "cameraOdometry"])
-  sm = SubMaster(["deviceState", "carState", "roadCameraState", "liveCalibration", "driverMonitoringState", "carControl", "selfdriveState", "liveDelay", "carrotMan", "radarState"])
+  sm = SubMaster(["deviceState", "carState", "roadCameraState", "liveCalibration", "driverMonitoringState", "carControl", "selfdriveState", "liveDelay", "carrotMan", "radarState", "navInstructionCarrot", "navRoute"])
 
   publish_state = PublishState()
   params = Params()
@@ -406,7 +412,10 @@ def main(demo=False):
   long_delay = CP.longitudinalActuatorDelay + LONG_SMOOTH_SECONDS
   prev_action = log.ModelDataV2.Action()
 
-  DH = DesireHelper()
+  from opendbc.car.tesla.values import TeslaFlags
+  DH = DesireHelper(tesla_auto_signals=CP.brand == "tesla" and bool(CP.flags & TeslaFlags.AUTO_TURN_SIGNALS))
+  nav_input = MapInput()
+
 
   frame = 0
   custom_lat_delay = 0.0
@@ -415,6 +424,7 @@ def main(demo=False):
   camera_yaw_trim_deg = params.get_float("CameraYawTrimDeg") * 0.01
   lat_delay_dynamic = lat_smooth_seconds
   diagnostics = RuntimeDiagnostics('modeld', cloudlog.event)
+  camera_gap = CameraGapTrace(cloudlog.event)
   while True:
     loop_start, cpu_start = time.monotonic(), time.thread_time()
     frame += 1
@@ -432,7 +442,7 @@ def main(demo=False):
         params.put_bool_nonblocking("UsbGpuHardwareSeen", True)
       params.put_bool_nonblocking("UsbGpuCompiled", usbgpu_compiled_path() is not None)
 
-    frames = receive_camera_pair(vipc_client_main, vipc_client_extra if use_extra_client else None)
+    frames = camera_gap.receive(vipc_client_main, vipc_client_extra if use_extra_client else None)
     if frames is None:
       cloudlog.debug("camera pair unavailable or out of sync")
       continue
@@ -494,8 +504,11 @@ def main(demo=False):
       'action_t': np.array([lat_action_t, long_action_t], dtype=np.float32),
     }
 
+    inputs.update(nav_input.update(model, sm, v_ego))
+
+    inference_started = time.monotonic()
     mt1 = time.perf_counter()
-    camera_age_at_run_ms = (time.monotonic() - meta_main.timestamp_eof * 1e-9) * 1000
+    camera_age_at_run_ms = (inference_started - meta_main.timestamp_eof * 1e-9) * 1000
     inference_cpu_start = time.thread_time()
     try:
       model_output = model.run(bufs, transforms, inputs, prepare_only)
@@ -566,6 +579,11 @@ def main(demo=False):
       modelv2_send.modelV2.meta.desireLog = DH.desireLog #carrot
       modelv2_send.modelV2.meta.laneChangeBlinkerHold = DH.blinker_hold_direction
       modelv2_send.modelV2.meta.leverTurn = DH.lever_turn
+      modelv2_send.modelV2.meta.autoTurnSignal = DH.auto_turn_signal
+      modelv2_send.modelV2.meta.autoTurnSignalLaneChange = DH.auto_turn_signal_lane_change
+      modelv2_send.modelV2.meta.autoTurnSignalDirection = DH.auto_signal_direction
+      modelv2_send.modelV2.meta.autoTurnSignalRequestId = DH.auto_signal_request_id
+
       drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
       drivingdata_send.drivingModelData.meta.laneChangeDirection = DH.lane_change_direction
 
@@ -621,6 +639,12 @@ def main(demo=False):
         if egpu_recovery.task is not None:
           egpu_recovery.task.cancel.set()
         egpu_recovery = None
+    camera_gap.record(meta_main.frame_id, vipc_dropped_frames, inference_backend,
+                      camera_wait=(camera_ready - loop_start) * 1000,
+                      before_inference=(inference_started - camera_ready) * 1000,
+                      inference=model_execution_time * 1000,
+                      postprocess=(time.perf_counter() - mt2) * 1000,
+                      loop=(time.monotonic() - loop_start) * 1000)
     diagnostics.record(
       context={'backend': inference_backend, 'usbgpu': inference_usbgpu, 'frame_id': meta_main.frame_id},
       camera_wait_ms=(camera_ready - loop_start) * 1000,

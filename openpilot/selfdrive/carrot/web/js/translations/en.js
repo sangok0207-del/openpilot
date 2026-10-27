@@ -5,6 +5,7 @@ window.CarrotTranslations.register("en", {
   nativeName: "English",
   shortName: "EN",
   strings: {
+    model_library_title: "External driving model",
     egpu_model_recovering: "eGPU reconnecting",
     egpu_model_recovering_detail: "The internal model remains in use while eGPU recovery is attempted, up to three times.",
     egpu_model_recovery_ready: "eGPU READY",
@@ -226,6 +227,7 @@ window.CarrotTranslations.register("en", {
     onnx_vision_summary_starting: "Waiting for the ONNX service to start.",
     onnx_vision_summary_unavailable: "The ONNX service is not responding.",
     onnx_vision_summary_waiting: "Models are ready; waiting for road cameras.",
+    onnx_vision_summary_lane_only: "Lane detection is ready; vision BSD is off.",
     onnx_vision_summary_ready: "Lane and blindspot detection are ready.",
     onnx_vision_summary_attention: "Check the ONNX model or its configuration.",
     onnx_vision_open_diagnostics: "Open diagnostics",

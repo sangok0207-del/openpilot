@@ -83,6 +83,7 @@ CLUSTER_SCREEN_MODE_DEBUG_GRAPH = 3
 CLUSTER_SCREEN_MODE_DEBUG_GRAPH_RIGHT = 4
 CLUSTER_SCREEN_MODE_TRIP_REPORT = 5
 CLUSTER_SCREEN_MODE_NAVI = 6
+CLUSTER_SCREEN_MODE_NAV_MODEL = 7
 CLUSTER_SCREEN_MODE_PARAM = "ClusterHudScreenMode"
 CLUSTER_RADAR_INFO_NONE = 0
 CLUSTER_RADAR_INFO_VEHICLE_SPEED = 1
@@ -419,6 +420,7 @@ def normalize_cluster_screen_mode(value: object) -> int:
             "driving_report": CLUSTER_SCREEN_MODE_TRIP_REPORT,
             "navi": CLUSTER_SCREEN_MODE_NAVI,
             "navigation": CLUSTER_SCREEN_MODE_NAVI,
+            "nav-model": CLUSTER_SCREEN_MODE_NAV_MODEL,
         }
         if normalized in aliases:
             return aliases[normalized]
@@ -439,6 +441,7 @@ def normalize_cluster_screen_mode(value: object) -> int:
         CLUSTER_SCREEN_MODE_DEBUG_GRAPH_RIGHT,
         CLUSTER_SCREEN_MODE_TRIP_REPORT,
         CLUSTER_SCREEN_MODE_NAVI,
+        CLUSTER_SCREEN_MODE_NAV_MODEL,
     ):
         return mode
     return CLUSTER_SCREEN_MODE_DEFAULT
