@@ -4216,8 +4216,8 @@ class ClusterUiRenderer:
             )
             self._profile_add("hud.turn_signal_left", profile_stage)
             profile_stage = self._profile_start()
-            if self._theme.name != "tesla":  # Tesla column draws its own autopilot wheel
-                self._draw_drive_status(state)
+            # Tesla keeps the carrot wheel, Wi-Fi and Jetson badge/temperature row (owner 10-27)
+            self._draw_drive_status(state)
             self._profile_add("hud.drive_status", profile_stage)
             profile_stage = self._profile_start()
             self._draw_turn_signal(
@@ -4250,10 +4250,8 @@ class ClusterUiRenderer:
                 )
                 self._profile_add("hud.navi_traffic", profile_stage)
             profile_stage = self._profile_start()
-            if self._theme.name == "tesla":
-                self._draw_tesla_navi_banner(state)
-            else:
-                self._draw_center_clock(state, center_x=self._center_clock_x(screen_mode))
+            # Tesla keeps the clock; turn guidance is already in the right navi panel (owner 10-27)
+            self._draw_center_clock(state, center_x=self._center_clock_x(screen_mode))
             self._profile_add("hud.center_clock", profile_stage)
         finally:
             rl.rl_pop_matrix()
@@ -7255,24 +7253,16 @@ class ClusterUiRenderer:
         )
 
     def _draw_tesla_speed_block(self, state: ClusterUiState) -> None:
-        """Tesla-style left column: autopilot wheel + limit sign, big speed, P R N D, set speed and gap."""
+        """Tesla-style left column below the status row: big speed + limit sign, P R N D, set speed and gap."""
         theme = self._current_theme()
         stroke = (5, 8, 12)
-        # autopilot wheel (blue while steering is engaged)
-        wheel_color = (47, 140, 255) if state.lfa_active else (92, 101, 115)
-        wc = rl.Vector2(95.0, 80.0)
-        for r in (28.0, 27.0, 26.0, 25.0):
-            rl.draw_circle_lines(int(wc.x), int(wc.y), r, rl_color(wheel_color))
-        rl.draw_line_ex(rl.Vector2(68.0, 86.0), rl.Vector2(122.0, 86.0), 4.0, rl_color(wheel_color))
-        rl.draw_line_ex(rl.Vector2(95.0, 86.0), rl.Vector2(95.0, 106.0), 4.0, rl_color(wheel_color))
-        self._draw_text_with_stroke("AUTO", 95.0, 128.0, 20, wheel_color, stroke, 1, anchor="center", cache=True)
-        # speed limit sign
+        # speed limit sign beside the big speed (the top row keeps the carrot wheel, Wi-Fi and clock)
         if state.speed_limit_kph is not None:
-            center = rl.Vector2(220.0, 82.0)
+            center = rl.Vector2(310.0, 210.0)
             rl.draw_circle_v(center, 42.0, rl_color(RED))
             rl.draw_circle_v(center, 33.0, rl_color(WHITE))
             limit_text = str(int(round(display_speed(state.speed_limit_kph, self.is_metric))))
-            self._draw_text(limit_text, 220.0, 84.0, 40 if len(limit_text) <= 2 else 34, TEXT, anchor="center")
+            self._draw_text(limit_text, 310.0, 212.0, 40 if len(limit_text) <= 2 else 34, TEXT, anchor="center")
         # big speed
         display_speed_kph = state.display_speed_kph if state.display_speed_kph is not None else state.speed_kph
         speed_text = str(int(round(display_speed(clamp(display_speed_kph, 0.0, MAX_SPEED_KPH), self.is_metric))))
@@ -7288,20 +7278,6 @@ class ClusterUiRenderer:
             self._draw_text_with_stroke(f"SET {self._cruise_set_speed_text(state)}", 62.0, 408.0, 24, theme.muted, stroke, 1, anchor="left")
         if state.cruise_gap:
             self._draw_text_with_stroke(f"GAP {int(state.cruise_gap)}", 62.0, 442.0, 24, theme.muted, stroke, 1, anchor="left")
-
-    def _draw_tesla_navi_banner(self, state: ClusterUiState) -> None:
-        """Tesla-style turn banner at the top of the driving view from the live Naver guidance."""
-        live = state.navi_live
-        current = live.current if live is not None else None
-        if current is None or current.distance_m is None or current.distance_m <= 0:
-            return
-        dist = current.distance_m
-        dist_text = f"{dist / 1000:.1f} km" if dist >= 1000 else f"{int(dist)} m"
-        label = current.main_text or current.road_name or current.near_direction or ""
-        text = f"{dist_text}  {label}".strip()
-        rect = rl.Rectangle(330.0, 10.0, 470.0, 68.0)
-        rl.draw_rectangle_rounded(rect, 0.35, 10, rl_color((28, 32, 40), 235))
-        self._draw_text_with_stroke(text[:24], rect.x + 24.0, rect.y + 27.0, 26, WHITE, (5, 8, 12), 1, anchor="left")
 
     def _draw_speed_block(self, state: ClusterUiState, *, tpms_offset_x: float = 0.0) -> None:
         theme = self._current_theme()
