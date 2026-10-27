@@ -3604,12 +3604,20 @@ def build_cluster_scene(
         # Tesla style: grey road surface only where the model sees road, i.e. between the
         # left and right road edges (median / shoulder), so no phantom lane beyond the 1st
         # or last lane (owner 10-27). Falls back to edge offsets, then to the ego lane.
+        # Road edges wobble, so the floor runs between the outermost *lane lines* that lie
+        # inside the road edges: smooth, and flush with the drawn white lane lines.
         floor_color = rgba(theme.road)
         floor_strip = None
-        if state.left_road_edge_points and state.right_road_edge_points:
+        visible = [m for m in state.lanes if m.visible and len(m.model_points) >= 2]
+        left_limit = state.left_road_edge_offset if state.left_road_edge_offset is not None else -1.6
+        right_limit = state.right_road_edge_offset if state.right_road_edge_offset is not None else 1.6
+        lefts = [m for m in visible if left_limit - 0.3 <= m.offset < 0.0]
+        rights = [m for m in visible if 0.0 < m.offset <= right_limit + 0.3]
+        if lefts and rights:
+            lm = min(lefts, key=lambda m: m.offset)
+            rm = max(rights, key=lambda m: m.offset)
             floor_strip = strip_between_model_lines(
-                state.left_road_edge_points, state.right_road_edge_points,
-                state.left_road_edge_lateral_shift_m, state.right_road_edge_lateral_shift_m,
+                lm.model_points, rm.model_points, lm.model_lateral_shift_m, rm.model_lateral_shift_m,
                 road_start_m, road_end_m, road_steps, floor_color, 0.002,
                 longitudinal_scale=longitudinal_render_distance_scale(state), extend_before_model=True,
             )
