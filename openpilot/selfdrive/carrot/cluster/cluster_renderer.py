@@ -3194,8 +3194,9 @@ class ClusterUiRenderer:
                 self._draw_strip(strip)
             self._profile_add("draw_scene.planned_path", profile_stage)
             profile_stage = self._profile_start()
-            for point in scene.radar_points:
-                self._draw_radar_point(point)
+            if self._theme.name != "tesla":  # Tesla view hides raw radar points (noise)
+                for point in scene.radar_points:
+                    self._draw_radar_point(point)
             self._profile_add("draw_scene.radar_points", profile_stage)
             profile_stage = self._profile_start()
             for vehicle in scene.vehicles:
@@ -3212,16 +3213,17 @@ class ClusterUiRenderer:
             rl.rl_translatef(scene_offset_x, 0.0, 0.0)
         try:
             profile_stage = self._profile_start()
-            self._draw_radar_point_labels(
-                scene.radar_points,
-                camera,
-                scene.scene_shift_x_m,
-                state.radar_info_mode,
-            )
+            if self._theme.name != "tesla":
+                self._draw_radar_point_labels(
+                    scene.radar_points,
+                    camera,
+                    scene.scene_shift_x_m,
+                    state.radar_info_mode,
+                )
             self._profile_add("draw_scene.radar_labels", profile_stage)
             profile_stage = self._profile_start()
             self._draw_vehicle_badges(
-                scene.vehicles,
+                tuple(v for v in scene.vehicles if not self._tesla_hides_vehicle(v)),
                 camera,
                 scene.scene_shift_x_m,
                 state.radar_info_mode,
@@ -3485,9 +3487,23 @@ class ClusterUiRenderer:
             self._triangle_strip_point_cache.popitem(last=False)
         return points, point_count
 
+    def _tesla_hides_vehicle(self, vehicle: VehicleBox) -> bool:
+        """Tesla theme shows only likely-real cars: ego, lead, cut-in, or confident tracks in adjacent lanes."""
+        if self._theme.name != "tesla":
+            return False
+        if vehicle.source == "radarPoint":
+            return True
+        if (not vehicle.source) or vehicle.primary or vehicle.cut_in:
+            return False
+        return vehicle.confidence < 0.5 or abs(vehicle.center.x) > 5.5
+
     def _draw_vehicle(self, vehicle: VehicleBox) -> None:
         if self._vehicle_model is not None and self._theme.name == "tesla" and vehicle.source != "radarPoint":
-            # Tesla style: every detected vehicle is a grey car model, never a box or marker
+            # Tesla style: grey car models, but only for objects that are likely real cars.
+            # Radar tracks also report guardrails/signs/reflections (owner 10-27: "레이다 노이즈"),
+            # so non-lead tracks need confidence and must be within the adjacent lanes.
+            if self._tesla_hides_vehicle(vehicle):
+                return
             self._draw_vehicle_shadow(vehicle)
             self._draw_vehicle_model(vehicle)
             return
@@ -7319,9 +7335,9 @@ class ClusterUiRenderer:
             self._draw_text_with_stroke(ch, 62.0 + i * 44.0, 360.0, 34, color, stroke, 1, anchor="left", cache=True)
         # set speed and following gap
         if self._cruise_set_visible(state):
-            self._draw_text_with_stroke(f"설정 {self._cruise_set_speed_text(state)}", 62.0, 408.0, 24, theme.muted, stroke, 1, anchor="left")
+            self._draw_text_with_stroke(f"SET {self._cruise_set_speed_text(state)}", 62.0, 408.0, 24, theme.muted, stroke, 1, anchor="left")
         if state.cruise_gap:
-            self._draw_text_with_stroke(f"차간 {int(state.cruise_gap)}단", 62.0, 442.0, 24, theme.muted, stroke, 1, anchor="left")
+            self._draw_text_with_stroke(f"GAP {int(state.cruise_gap)}", 62.0, 442.0, 24, theme.muted, stroke, 1, anchor="left")
 
     def _draw_tesla_navi_banner(self, state: ClusterUiState) -> None:
         """Tesla-style turn banner at the top of the driving view from the live Naver guidance."""
