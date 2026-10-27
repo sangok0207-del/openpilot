@@ -3601,16 +3601,30 @@ def build_cluster_scene(
     profile_stage = profile_scene_start(profile_add)
     highlight_lanes: list[MeshStrip] = []
     if theme.name == "tesla":
-        # Tesla style: a grey road surface under the ego lane and both neighbours
-        for floor_offset in (-1.0, 0.0, 1.0):
-            floor_strip = lane_floor_strip(
-                state, floor_offset, rgba(theme.road), lane_width_m, road_start_m, road_end_m, road_steps, route_mode, 0.002
-            ) or strip_between_offsets(
-                floor_offset - 0.5, floor_offset + 0.5, state.steering, lane_width_m,
-                road_start_m, road_end_m, road_steps, rgba(theme.road), 0.002,
+        # Tesla style: grey road surface only where the model sees road, i.e. between the
+        # left and right road edges (median / shoulder), so no phantom lane beyond the 1st
+        # or last lane (owner 10-27). Falls back to edge offsets, then to the ego lane.
+        floor_color = rgba(theme.road)
+        floor_strip = None
+        if state.left_road_edge_points and state.right_road_edge_points:
+            floor_strip = strip_between_model_lines(
+                state.left_road_edge_points, state.right_road_edge_points,
+                state.left_road_edge_lateral_shift_m, state.right_road_edge_lateral_shift_m,
+                road_start_m, road_end_m, road_steps, floor_color, 0.002,
+                longitudinal_scale=longitudinal_render_distance_scale(state), extend_before_model=True,
             )
-            if floor_strip is not None:
-                highlight_lanes.append(floor_strip)
+        if floor_strip is None and state.left_road_edge_offset is not None and state.right_road_edge_offset is not None:
+            floor_strip = strip_between_offsets(
+                clamp(state.left_road_edge_offset, -2.8, -0.5), clamp(state.right_road_edge_offset, 0.5, 2.8),
+                state.steering, lane_width_m, road_start_m, road_end_m, road_steps, floor_color, 0.002,
+            )
+        if floor_strip is None:
+            floor_strip = lane_floor_strip(
+                state, 0.0, floor_color, lane_width_m, road_start_m, road_end_m, road_steps, route_mode, 0.002
+            ) or strip_between_offsets(
+                -0.5, 0.5, state.steering, lane_width_m, road_start_m, road_end_m, road_steps, floor_color, 0.002,
+            )
+        highlight_lanes.append(floor_strip)
     if state.highlight_lane_offset is not None and highlight_lane_lit:
         highlight_strip = lane_floor_strip(
             state,
