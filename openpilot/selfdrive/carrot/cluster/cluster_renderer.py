@@ -7338,9 +7338,9 @@ class ClusterUiRenderer:
             # following gap right after km/h as deep fluorescent blue bars plus the step number (owner 10-28)
             gap = int(clamp(float(state.cruise_gap), 1.0, float(FOLLOW_STATUS_GAP_BARS)))
             for i in range(FOLLOW_STATUS_GAP_BARS):
-                self._rounded_rect(136.0 + i * 24.0, 281.0, 18.0, 22.0, 4.0,
+                self._rounded_rect(160.0 + i * 24.0, 281.0, 18.0, 22.0, 4.0,
                                    TESLA_GAP_BLUE if i < gap else (40, 48, 62), None, 0.0)
-            self._draw_text_with_stroke(str(gap), 240.0, 292.0, 36, TESLA_GAP_BLUE, stroke, 2, anchor="left", cache=True)
+            self._draw_text_with_stroke(str(gap), 264.0, 292.0, 36, TESLA_GAP_BLUE, stroke, 2, anchor="left", cache=True)
 
     def _draw_speed_block(self, state: ClusterUiState, *, tpms_offset_x: float = 0.0) -> None:
         theme = self._current_theme()
