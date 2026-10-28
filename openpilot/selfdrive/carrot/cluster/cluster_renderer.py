@@ -7334,7 +7334,13 @@ class ClusterUiRenderer:
         if self._cruise_set_visible(state):
             self._draw_text_with_stroke(f"SET {self._cruise_set_speed_text(state)}", 62.0, 408.0, 24, theme.muted, stroke, 1, anchor="left")
         if state.cruise_gap:
-            self._draw_text_with_stroke(f"GAP {int(state.cruise_gap)}", 62.0, 442.0, 24, theme.muted, stroke, 1, anchor="left")
+            # following gap as cluster-style bars plus the step number, large enough to read at a glance (owner 10-28)
+            gap = int(clamp(float(state.cruise_gap), 1.0, float(FOLLOW_STATUS_GAP_BARS)))
+            self._draw_text_with_stroke("GAP", 62.0, 444.0, 28, WHITE, stroke, 1, anchor="left", cache=True)
+            for i in range(FOLLOW_STATUS_GAP_BARS):
+                self._rounded_rect(124.0 + i * 30.0, 432.0, 24.0, 24.0, 4.0,
+                                   WHITE if i < gap else (60, 66, 76), None, 0.0)
+            self._draw_text_with_stroke(str(gap), 250.0, 444.0, 34, WHITE, stroke, 2, anchor="left", cache=True)
 
     def _draw_speed_block(self, state: ClusterUiState, *, tpms_offset_x: float = 0.0) -> None:
         theme = self._current_theme()
