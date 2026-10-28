@@ -556,6 +556,28 @@ def marking_near_offset(markings: tuple[LaneMarking, ...], offset: float) -> Lan
     return marking if abs(marking.offset - offset) <= 0.30 else None
 
 
+TESLA_FLOOR_HOLD_FRAMES = 5  # about 0.5 s at the 10 Hz HUD refresh; older geometry goes stale
+_tesla_floor_hold: dict[str, tuple[object, int]] = {}
+
+
+def _held_floor_line(candidates, side: str, pick):
+    """Tesla floor edge line, held across frames so the grey floor does not sway."""
+    held = _tesla_floor_hold.get(side)
+    if candidates:
+        line = pick(candidates, key=lambda m: m.offset)
+        if held is not None:
+            near = min(candidates, key=lambda m: abs(m.offset - held[0].offset))
+            if abs(near.offset - held[0].offset) <= 0.5:
+                line = near
+        _tesla_floor_hold[side] = (line, 0)
+        return line
+    if held is not None and held[1] < TESLA_FLOOR_HOLD_FRAMES:
+        _tesla_floor_hold[side] = (held[0], held[1] + 1)
+        return held[0]
+    _tesla_floor_hold.pop(side, None)
+    return None
+
+
 def lane_floor_strip(
     state: ClusterUiState,
     lane_center_offset: float,
@@ -3606,6 +3628,9 @@ def build_cluster_scene(
         # or last lane (owner 10-27). Falls back to edge offsets, then to the ego lane.
         # Road edges wobble, so the floor runs between the outermost *lane lines* that lie
         # inside the road edges: smooth, and flush with the drawn white lane lines.
+        # The chosen outer lines are held across frames (N16 flickers line visibility and
+        # road edges at standstill, which made the floor sway, owner 10-28); without both
+        # lines the floor is the fixed ego lane rather than the noisy road-edge offsets.
         floor_color = rgba(theme.road)
         floor_strip = None
         visible = [m for m in state.lanes if m.visible and len(m.model_points) >= 2]
@@ -3613,23 +3638,16 @@ def build_cluster_scene(
         right_limit = state.right_road_edge_offset if state.right_road_edge_offset is not None else 1.6
         lefts = [m for m in visible if left_limit - 0.3 <= m.offset < 0.0]
         rights = [m for m in visible if 0.0 < m.offset <= right_limit + 0.3]
-        if lefts and rights:
-            lm = min(lefts, key=lambda m: m.offset)
-            rm = max(rights, key=lambda m: m.offset)
+        lm = _held_floor_line(lefts, "left", min)
+        rm = _held_floor_line(rights, "right", max)
+        if lm is not None and rm is not None:
             floor_strip = strip_between_model_lines(
                 lm.model_points, rm.model_points, lm.model_lateral_shift_m, rm.model_lateral_shift_m,
                 road_start_m, road_end_m, road_steps, floor_color, 0.002,
                 longitudinal_scale=longitudinal_render_distance_scale(state), extend_before_model=True,
             )
-        if floor_strip is None and state.left_road_edge_offset is not None and state.right_road_edge_offset is not None:
-            floor_strip = strip_between_offsets(
-                clamp(state.left_road_edge_offset, -2.8, -0.5), clamp(state.right_road_edge_offset, 0.5, 2.8),
-                state.steering, lane_width_m, road_start_m, road_end_m, road_steps, floor_color, 0.002,
-            )
         if floor_strip is None:
-            floor_strip = lane_floor_strip(
-                state, 0.0, floor_color, lane_width_m, road_start_m, road_end_m, road_steps, route_mode, 0.002
-            ) or strip_between_offsets(
+            floor_strip = strip_between_offsets(
                 -0.5, 0.5, state.steering, lane_width_m, road_start_m, road_end_m, road_steps, floor_color, 0.002,
             )
         highlight_lanes.append(floor_strip)
