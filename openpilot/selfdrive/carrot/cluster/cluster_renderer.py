@@ -7341,6 +7341,13 @@ class ClusterUiRenderer:
                 self._rounded_rect(160.0 + i * 24.0, 281.0, 18.0, 22.0, 4.0,
                                    TESLA_GAP_BLUE if i < gap else (40, 48, 62), None, 0.0)
             self._draw_text_with_stroke(str(gap), 264.0, 292.0, 36, TESLA_GAP_BLUE, stroke, 2, anchor="left", cache=True)
+        # tire pressures under the regen/ECO gauge, centred on it (owner 10-28)
+        rl.rl_push_matrix()
+        rl.rl_translatef(-17.0, 0.0, 0.0)
+        try:
+            self._draw_tpms_status(state)
+        finally:
+            rl.rl_pop_matrix()
 
     def _draw_speed_block(self, state: ClusterUiState, *, tpms_offset_x: float = 0.0) -> None:
         theme = self._current_theme()

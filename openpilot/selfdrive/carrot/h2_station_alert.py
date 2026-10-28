@@ -225,7 +225,7 @@ def main() -> None:
     os.nice(19)
   except OSError:
     pass
-  sm = messaging.SubMaster(["deviceState", "carState", "gpsLocation"])
+  sm = messaging.SubMaster(["deviceState", "carState", "gpsLocation", "carrotMan"])
   economy, range_reader = TripEconomy(), RangeReader()
   econ = None
   cluster: dict = {}
@@ -257,6 +257,10 @@ def main() -> None:
 
     gps = sm["gpsLocation"]
     pos = (gps.latitude, gps.longitude) if sm.recv_frame["gpsLocation"] > 0 and gps.hasFix and abs(gps.latitude) > 1 else None
+    if pos is None and sm.recv_frame["carrotMan"] > 0 and abs(sm["carrotMan"].xPosLat) > 1:
+      # 10-28 the modem gave no gpsLocation all afternoon, so the list kept using the home position;
+      # the phone navigation position from carrot_man keeps the nearest stations right
+      pos = (float(sm["carrotMan"].xPosLat), float(sm["carrotMan"].xPosLon))
     if pos is not None and now - saved_at > 60:
       save_pos(*pos)
       saved_at = now
