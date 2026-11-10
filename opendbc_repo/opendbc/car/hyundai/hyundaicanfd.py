@@ -7,6 +7,7 @@ from opendbc.car.carlog import carlog
 from opendbc.car.crc import CRC16_XMODEM
 from opendbc.car.hyundai.values import HyundaiFlags, HyundaiExtFlags
 from opendbc.car.hyundai.stopping import MOVING_SPEED, STOP_LOWER_BAND
+from opendbc.car.hyundai.stop_object import apply_signal_stop_object
 from openpilot.common.params import Params
 from openpilot.common.filter_simple import FirstOrderFilter
 from opendbc.car.common.conversions import Conversions as CV
@@ -494,6 +495,8 @@ def _apply_scc_lead(values, radar_state, model_v2=None, hud_lateral=None):
 def create_acc_control_scc2(packer, CAN, enabled, accel_value_last, accel, stopping, gas_override, set_speed, hud_control, hyundai_jerk, CS,
                             stop_controller=None, hud_lateral=None):
 
+  if stop_controller is not None:
+    stop_controller.stop_object_active = False
   if CS.scc_control is None:
     if stop_controller is not None:
       stop_controller.reset()
@@ -566,11 +569,14 @@ def create_acc_control_scc2(packer, CAN, enabled, accel_value_last, accel, stopp
   values["ZEROS_7"] = 0 if stop_controller is not None else 1
   apply_canfd_stopping(values, CS, stop_controller, accel, previous_value, jerk_u, jerk_l)
 
-  # Trial for no-lead stops: OEM SCC_ObjSta is named HUD_LEAD_INFO in this DBC.
-  # Change only the state after the final StopReq/interlocks; do not fabricate
-  # object distance/speed or latch it into RX. This is not a confirmed ESC gate.
-  if stop_controller is not None and values["ACCMode"] == 1 and values["StopReq"] == 1 and values["HUD_LEAD_INFO"] == 0:
+  # OEM SCC_ObjSta=2 denotes an object controllable longitudinally. During a
+  # final stop request, also promote a receding real lead from state 1. Keep
+  # its measured kinematics and the existing no-lead state fallback.
+  if stop_controller is not None and values["ACCMode"] == 1 and values["StopReq"] == 1 and values["HUD_LEAD_INFO"] in (0, 1):
     values["HUD_LEAD_INFO"] = 2
+
+  if stop_controller is not None:
+    stop_controller.stop_object_active = apply_signal_stop_object(values, CS, hud_control, stopping_controller=stop_controller)
 
   return packer.make_can_msg("SCC_CONTROL", CAN.ECAN, values), values["aReqValue"]
 
@@ -1159,7 +1165,8 @@ def create_ccnc_messages(CP, packer, CAN, frame, CC, CS, hud_control,
         values = copy.copy(CS.adrv_0x1ea)
         rx_counter = values.pop("COUNTER", None)
         # blinker hold: the confirmed lane change until the body is across (see _blink_hold_side)
-        hold = _blink_hold_side(md, desire, create_ccnc_messages.__dict__.setdefault("_blink_hold", {}))
+        hold_desire = 0 if getattr(CS.out, "cruiseCancelState", False) else desire
+        hold = _blink_hold_side(md, hold_desire, create_ccnc_messages.__dict__.setdefault("_blink_hold", {}))
         external_hold = getattr(hud_control, "physicalBlinkerHold", 0)
         if external_hold in (1, 2, 3):
           hold = {1:0, 2:3, 3:4}[external_hold]

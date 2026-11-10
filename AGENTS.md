@@ -1,5 +1,174 @@
 # Repository memory
 
+- 2026-11-11: Owner requests state2 trial after I5PE11c8/2 rollback with real
+  radar lead41 maintained. Camera-SCC final ACCMode1/StopReq1 now promotes
+  receding real-lead state1 to SCC_ObjSta2, alongside existing no-lead state0
+  fallback. Scope chosen for final stop packets; departure restores normal
+  relative-speed mapping. Four regressions fail before, related261 pass after.
+  Eight-log full-builder A/B23987calls changes475 object-state/CRC packets,
+  23512 identical; acceleration/phase/synthetic-marker outputs agree. OEM
+  parity remains partial: I5PE band.04 vs ours.20, target distance, InfoDisplay,
+  entry timing and trajectories differ. Prior nine failure entries had state2.
+  ESC acceptance and physical hold effect remain unverified. Evidence private
+  .analysis/archive/2026-11-11/stop-state-trial and existing stop-object doc.
+
+- 2026-11-10: Use the actual Carrot cruise cancel latch, not cruise enablement
+  or a timeout, to pause automatic physical indicator requests until SET/RES or
+  +/- clears it. Keep the driver's lever and explicit BT signals independent.
+  Ioniq 5 PE 11c5/36 video shows the right-hand split near 56s. Current-state
+  right-lane probability was still low; the first two future forecast rows
+  agreed before the crossing. The optional model-desire lamp observes these
+  only with measured same-side boundary approach and existing ownership gates.
+  A/B replay through the lamp policy with a ready receiver: new right request
+  at 55.800s; the other 15 segments match. A forecast-owned widening fork
+  tracks far-side progress and lane relabeling while same-side intent persists;
+  11c5/36 owns one request until 58.698s. Replay does not prove physical light.
+
+- 2026-11-09: Fix the four full-build Bluetooth import failures previously
+  reported as pre-existing. Cluster paths expose openpilot/tools as top-level
+  tools, hiding root tools/jetlink even with the repository first on sys.path.
+  Extend only that legacy package namespace using pkgutil; canonical
+  openpilot.tools stays scoped. Fresh-process regressions cover both path orders,
+  vehicle-only paths, preloaded tools, real Monitor/Owner and updater imports.
+  Four cases reproduce failure before correction; all six pass after. Desktop
+  Bluetooth61 pass/one Linux-only skip. This is a production import failure
+  under the same path condition; prior CI failure does not establish device safety.
+  Reviewed PV5 captures show controlsd NameError, plus signal-camera geometry
+  rejection; no tools.jetlink exception in those three captures.
+
+- 2026-11-09: PV5 uploaded process_crash13:30:20 at e318f767 proves controlsd
+  repeatedly exits in publish with undefined t_since_plan. Introduced by our
+  7d337 stop-object change; the previous state_control/helper checks missed the
+  publish scope. Compute plan age from SubMaster in publish. Complete-method
+  real-cereal regression reproduces the NameError before correction and passes
+  54 cases afterward, including inactive/non-CANFD and stale/invalid inputs.
+  Add it to native Signal and full-build CI. Local related97 and F821 check pass.
+  Vehicle installation/restart and physical operation require separate evidence.
+
+- 2026-11-09: Casper EV 1ef4/12 has bus2 SCC11 fixed10.4m/+0.2m/s in
+  2163/2217 plausible objects, 176 SCC/vision handoffs, original FCA fault297/2990.
+  Panda hardwareCAN2/canState1 error-passive has606231 new error IRQs/59.9s;
+  this is distinct from logical SCC bus2, whose counter is continuous. Owner
+  confirms stock wiring; no proven common electrical root cause. Add confirmed
+  current CAN error-storm and recurring raw Casper FCA fault alerts/no-entry/
+  disable; AlwaysLateral cannot bypass them. Preserve raw evidence and outgoing
+  FCA compatibility handling. Replay confirms CAN0.591s/FCA2.141s into segment.
+  Separately owner requests CANFD no-lead signal-stop3m object plus cone; newest
+  recurrence log deleted. Archived I5PE stock1138 StopReq packets have object2,
+  distance3.4..4.4m; older failure has no-object204.6m/239.4mps. Camera-SCC trial
+  fills3m/relative-vEgo/state2 only after final low-speed StopReq/interlocks and
+  fresh signal-stop/no-real-lead gates. No radar/model/MPC/aReq/jerk/band change.
+  Generated-packet marker drives fresh C3/C4 cone; not ESC acceptance or OEM icon.
+  Timestamp-sorted2998-call replay changes681 object/CRC packets,2317 identical.
+  Local465/Wiki25 pass; final native42554894007 passes1960+362subtests/40skip,
+  131backend+216focused. Full build/control/UI pass; final group retains the same
+  four tools.jetlink Bluetooth imports as baseline0df836. Code7d337b0549 plus
+  coneb8f7f3b405; NAS scheduled replay7d337 verified1196 frames/hash/public page.
+  Normal GitPull/full comma restart, no vehicle installation or physical hold
+  proof. See docs/casper_scc_input_20261109.md and docs/canfd_signal_stop_object_20261109.md.
+
+- 2026-11-09: Ioniq 5 PE route 11bb/7 camera shows a manual move into the
+  right lane near 37 s. Speed fell from above 30 to 26.43 km/h during approach;
+  wheel angle was about 22 degrees. The 30 km/h boundary observer reset.
+  Owner requests a 5 km/h minimum for both manual lamp features. Lower the PE
+  manual lane observer and external output admission to 5 km/h; manual turns
+  already use 5–60. Keep lane geometry, torque, feedback isolation, and the
+  separate Tesla/steering thresholds. Low-speed lane relabels do not suppress
+  a turn independently supported by driver steering and measured rotation.
+  Offline A/B through observation and lamp policy, ready adapter assumed:
+  new right request at 36.475 s; unchanged left turn later in this segment.
+  In 14 comparison segments all 19 previous requests matched in time and side.
+  781 focused tests passed, 7 platform-specific skips. No physical lamp test.
+
+- On 2026-11-08 the owner requests slightly earlier manual turn indications and
+  asks about closely spaced turns. ManualTurnIndicator alone uses 42 degrees
+  steering/22 degrees growth and 100 ms confirmation. Its next observation
+  requires two seconds from last ownership renewal, one continuous dark second
+  and fresh steering. Torque duration, yaw/curve rejection, isolation of lamp
+  feedback and the other observers' quiet periods are preserved. A/B replay of
+  14528 recorded model frames matched all 10 indications on side and segment;
+  nine occurred earlier (median advance 0.054 s, maximum 1.253 s). Real lamp
+  response and the owner's unrecorded missed turn remain unverified.
+
+- On 2026-11-08 the owner requests voice lane changes to use normal lane-change
+  admission and issue the external indicator in parallel. This supersedes the
+  external-adapter confirmation prerequisite. Keep native and Tesla signal gates.
+  Ioniq 5 PE rlog 11b9/2 records one voice request, same-side physical flashes,
+  B1 override without accepted ID, preLaneChange for 3 s and no steering start.
+  The 0x413 lever bit outlasts the tap echo window. Receiver subreason is
+  unrecorded. A desktop replay of recorded inputs with a bound external adapter
+  and absent ACK reproduced the old timeout; new helper starts and requests
+  the left lamp on the same frame at segment 20.702 s. No actual crossing proof.
+
+- On 2026-11-08, owner requests an ATC-independent ManualTurnIndicator option.
+  DefaultOFF/Ioniq5PE/supported indicator adapter/AutoBlinker1or2. Shared lamp-only
+  observer uses5..60km/h, pressed same-side torque150ms/recent800ms, angle45deg
+  plus25deg growth, yaw3deg/s and1.5deg rotation/150ms confirmation. Recognized
+  matching lane curves suppress admission. Fresh pose/CAN/model and ownership
+  gates remain; existing journal/echo/ACK path isolates feedback before steering.
+  Return15deg+yaw<=3deg/s/moving300ms ends, opposite pressed torque pastzero
+  cancels; stop retains up to30s. ATC/nav/lateral activation are not admission.
+  Current14hash-matched logs174387477B plus prior21logs give39081 replayframes,
+  27candidates. Current10candidates reviewed with video include one street-right
+  turn and nine parking-area/ramp/entry maneuvers; unwanted parking indications
+  remain possible. Prior20manual requests have no candidate overlap within4s;
+  remaining older candidates lack new video labels, so no false-positive-rate
+  claim. Morning right0+45.611s starts0.803s after first pressed torque and ends
+  50.164s. Synthetic counterexamples/source ATC0..3 OFF/ON covered; local668 checks
+  pass. C3/C4 manual-turn reason; old USB HUD uses driver category/turning reason.
+  KO/EN guides/catalog updated. Normal GitPull/full comma restart then opt in.
+  No vehicle writes, CAN actuation, model or Jetson bundle; physical lamps untested.
+  Private evidence .analysis/scratch/2026-11-08-manual-turn.
+
+- On 2026-11-08, owner requests PR572 Tesla review/integration with code-only
+  validation because no Tesla is available. Merge contributor d40c8d247b into
+  current Wip, preserving newer native voice indicators and assistant admission.
+  Keep existing shared AlwaysLateral initialization default1, excluding PR's
+  global default0 change. Tesla gesture now toggles AlwaysLateral; new manual,
+  model-desire/path lamp options and CAN traffic-stop remain defaultOFF.
+  Traffic stop accepts only vision-backed8byte APP_trafficControl with active
+  OP longitudinal; retains other obstacles and normal soft-disable on loss.
+  Desktop1042/23subtests pass with32 native-safety cases deferred to Linux;
+  Wiki25 and focused Ruff pass. Add native MPC/planner, gesture/default tests
+  to full-build CI. Linux Signal42433213035 passes1963/40skip/362subtests plus131;
+  eGPU/Jetson/docs pass. First full build passes50 new native checks but one
+  gesture test exposes a pre-existing fixture missing set_lane_change_blinkers
+  after voice integration. Bind the real helper; desktop full-control11 pass.
+  No vehicle writes or physical lamp/braking acceptance.
+
+- CarrotAssist 0.2.10 lets the user copy a Korean or English custom-instructions prompt from the device-name dialog. It shows how to append and save the prompt in ChatGPT. Copying does not modify the user’s ChatGPT account.
+
+- CarrotAssist 0.2.9 gives the Android recognizer left/right phrase hints and explains recognition failures. Keep the final-result confidence, direction agreement and age checks. No live maneuver or cabin accuracy measurement.
+
+- CarrotAssist 0.2.8 phone voice supports numbered results from its most recent search in the same listening session. Bind the position to the displayed row, recheck the parameter before committing, and announce its actual name.
+
+- CarrotAssist 0.2.7 phone voice searches the visible device catalog and writes explicit absolute integer settings without a relay session. Use the existing same-origin setting grant, prepare/commit validation and device readback. Never convert a broad search, ambiguous name or conflicting numerical recognition into a write.
+
+- CarrotAssist 0.2.6 supports foreground Android 12+ on-device speech recognition.
+  A local WebView readiness check precedes greeting/listening; no ChatGPT account,
+  relay pairing, cloud transcription or MCP grant is required on the direct route.
+  Korean/English explicit lane requests use the existing local driving grant and
+  vehicle gates. Execute only final, unambiguous recognition, with a bounded
+  direction-specific challenge if scores are missing. Opening AutoBlinkerControl
+  needs no driving grant. Questions launch the default assistant; repeat them in
+  that voice window. Support depends on the installed language model. The rules
+  and transport are tested offline; no real maneuver or cabin accuracy claim.
+
+- Voice lane changes retain normal admission on all supported vehicles, with or
+  without indicator hardware. Bind optional signaling once per request to an active
+  receiver on the current vehicle (AutoBlinkerControl=2), a supported native output,
+  or the existing Tesla path. After selection, timeout or loss never falls back to
+  unsignaled motion. External BLE/SPAS support follows receiver checks. PEAK/CANable
+  retains its verified CAN profile. No live maneuver or actual lamp test.
+
+- 2026-11-07 mini voice follow-up: two correctly transcribed “왼쪽으로 차로 변경”
+  refusals with no visible tool call; authenticated readback can_drive=true,
+  browser_online=true, last drive request none. Native greeting verifies web
+  pairing/connectivity only. The phone disabled both Android assist structure
+  and screenshot sharing; neither was changed. Account context in relay 0.7.8
+  reports vehicle telemetry as unobserved rather than hard-coded disconnected.
+  No live maneuver; this does not force plugin activation in a new mini session.
+
 - CarrotAssist 0.2.5 (code12) startup TTS announces an available device Git update once;
   the native greeting ends before showAssist. No startup question, affirmative handler,
   maintenance proposal or reboot. The optional carrot.tools grant also supports a fixed

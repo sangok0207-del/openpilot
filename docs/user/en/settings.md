@@ -2,13 +2,15 @@
 
 [한국어](../ko/settings.md)
 
+With **phone voice** in CarrotAssist 0.2.8, say “Find acceleration settings.” After granting setting access once on the device, say “Set acceleration setting zero to 240.” Direct commands work without ChatGPT or MCP registration. In the same voice session, you can follow a search with “Set the first one to 240”. [Phone voice instructions](carrot-assist.md)
+
 Android [CarrotAssist](carrot-assist.md) uses ChatGPT to find, explain and open settings. Separate device and ChatGPT authorization enables live reads and changes. With relay0.7.3, a clear setting/value or adjustment command applies after bounds checks without another question. For example, “Set acceleration setting 0 to 240” produces a short result after verified storage. Ambiguous requests and AI-recommended values require clarification; out-of-range values are rejected. Supported driving settings follow the same procedure while driving. Only initial authorization requires stationary/disengaged state; each setting keeps its existing activation timing.
 
 ChatGPT action approval is separate from device permission. Users who do not want repeated prompts can choose **ChatGPT Settings → Plugins → CarrotAssist → Permissions → Allow all actions** in their own account. This covers all actions authorized for this plugin; CarrotAssist cannot select it automatically. If old confirmation instructions remain, use **Refresh tools → new conversation**, not a fresh pairing code. To talk while touching the web, start background voice in the full ChatGPT app and return to CarrotAssist using the [documented steps](carrot-assist.md).
 
 Experimental lane-change and cruise set-speed requests within the same voice conversation need separate **Allow voice lane-change and set-speed commands** permission on both sides. Setting access never expands automatically. Settings retain internal current-value/bounds checks and readback; driving commands follow separate execution conditions. See the [continuous voice guide and supported conditions](carrot-assist.md).
 
-In CarrotAssist 0.2.4, drag the orange microphone to keep it in your preferred position. Tap to verify the current Carrot Web account link and online status, then open the default assistant overlay. If verification fails, choose **Check again** or **Open assistant only**. Invoking the assistant directly with the phone’s side key skips the app’s startup check. From 0.2.5 the greeting announces an available device Git update. With updated Carrot Web and Tools access, say “Open Naver Map” to launch the installed phone app.
+In CarrotAssist 0.2.4, drag the orange microphone to keep it in your preferred position. Tap to verify the current Carrot Web account link and online status, then open the default assistant overlay. If verification fails, choose **Check again** or **Open assistant only**. Invoking the assistant directly with the phone’s side key skips the app’s startup check. From 0.2.5 the greeting announces an available device Git update. With updated Carrot Web and Tools access, say “Open Naver Map” to launch the installed phone app. Version 0.2.6 supports direct turn-signal settings and left/right lane requests without ChatGPT registration on phones with on-device speech recognition.
 
 Voice Tools operations require separate **Allow Tools panels and actions** permission. The [CarrotAssist guide](carrot-assist.md) covers backup/restore screens, confirmed GitPull/restart jobs, and separate first-installation and reconnection steps. Paste authorization codes into the device approval webpage, never a voice conversation.
 
@@ -115,31 +117,34 @@ Ignoring `x0.01`, `x0.001`, `cm`, `km/h`, or `%` can make a value appear one hun
 
 ## Settings map
 
-The current `carrot_settings.json` contains **207 parameters**. The driver-monitoring exception and `NNFF` are search only; the remaining entries appear in these menus:
+The current `carrot_settings.json` contains **211 parameters**. The driver-monitoring exception and `NNFF` are search only; the remaining entries appear in these menus:
 
 | Category | Count | Groups |
 |---|---:|---|
-| Driving control | 124 | Startup and auto, buttons and presets, steering, speed and deceleration, cruise and following gap |
+| Driving control | 128 | Startup and auto, buttons and presets, steering, speed and deceleration, cruise and following gap |
 | Vehicle and hardware | 18 | Hyundai/Kia, CAN FD/HDA, radar, driver monitoring, vehicle assistance, device hardware |
 | Display | 34 | Information, path, brightness/on-road view, external HUD |
 | System | 12 | Recording/power, network/map, sound, software |
 
 ## Driving control
 
-These 124 settings can affect driving behavior. Change one item at a time.
+These 128 settings can affect driving behavior. Change one item at a time.
 
 <a id="start-auto"></a>
-### Startup and auto — 10 settings
+### Startup and auto — 14 settings
 
 | Section | Parameters | Purpose |
 |---|---|---|
-| Startup | `AlwaysLateral`, `TeslaAutoTurnSignals`, `AutoEngage`, `DisableMinSteerSpeed` | Always-on lateral control, Tesla lamps, automatic engagement, and low-speed steering limits |
+| Startup | `AlwaysLateral`, `TeslaAutoTurnSignals`, `TeslaCanTrafficStop`, `AutoEngage`, `DisableMinSteerSpeed` | Always-on lateral control, Tesla lamps/CAN red-light stop, automatic engagement, and low-speed steering limits |
 | Auto cruise | `AutoCruiseControl`, `AutoGasTokSpeed`, `AutoGasCancelSpeed`, `AutoGasSyncSpeed`, `CruiseOnDist` | Automatic cruise activation and accelerator-pedal behavior |
 
-- `AlwaysLateral` permits lateral control even when cruise is not engaged. On supported Tesla vehicles it can also steer at true standstill in a forward-driving gear; moving below the minimum steering speed remains restricted. See [Tesla engagement](tesla.md#engagement-and-standstill).
+- `AlwaysLateral` permits lateral control even when cruise is not engaged. Tesla's three-finger screen contact toggles it live instead of Experimental Mode; OFF does not disengage steering under active driving control. On supported Tesla vehicles it can also steer at true standstill in a forward-driving gear; moving below the minimum steering speed remains restricted. See [Tesla engagement](tesla.md#engagement-and-standstill).
+- Confirmed persistent CAN-controller errors or recurring Casper front-safety-system faults trigger an alert and disable always-on steering too; re-engagement is blocked until the fault clears.
 - Always Lateral waits for the first confirmation of valid model, vehicle-parameter, pose, and other required inputs after system startup. Once confirmed, this startup check ends; later input interruptions or disengagement/reengagement do not rearm it. Existing runtime safety handling remains unchanged. Expiry of the startup waiting period alone does not pass this check.
 - `AutoEngage`: `0` off, `1` lateral on, `2` lateral on with cruise ready.
-- `TeslaAutoTurnSignals`: default OFF, reboot required. Uses existing ATC requests on supported Model 3/Y with vehicle CAN and valid physical stalk input. It does not authorize steering or departure. See [Tesla automatic turn signals](tesla.md#automatic-turn-signals) for prerequisites and closed-course validation.
+- `TeslaAutoTurnSignals`: default OFF, reboot required. On supported Model 3/Y with vehicle CAN and valid physical stalk input, turn lamps start with turn desire, not navigation preparation or distance alone. Measured heading and wheel return govern completion; only confirmed turns can wait at standstill under fresh lateral permission. Automatic lane changes retain preparation-stage lamp confirmation. It does not authorize steering or departure. See [Tesla automatic turn signals](tesla.md#automatic-turn-signals) for prerequisites and closed-course validation.
+- `TeslaCanTrafficStop`: independent default-OFF Tesla CAN red-light stopping; restart required. Requires actual openpilot longitudinal control and the exact supported 8-byte vision-backed APP profile, not stock TACC. Below 126 m, confirmed red adds a stop constraint; green releases only its own constraint. Signal failure requests takeover/soft-disable. Other brands ignore it; see [Tesla CAN stopping](tesla.md#can-red-light-stopping) for protocol, pedal override and closed-course validation limits.
+- `TeslaManualLaneSignals`, `TeslaModelDesireSignals`, `TeslaModelPathSignals`: independent default-OFF Tesla lamp-only observations; reboot required. All require `TeslaAutoTurnSignals`, `ShareData`, fresh repeated ONNX dashed classification and supported adjacent-lane geometry above 30 km/h. Manual torque/approach can work without cruise; model desire/path predictions require active lateral control and can light early or falsely. Solid/dashed does not prove colour or traffic direction. No steering permission, navigation turn preannouncement or U-turn implementation is added; see the [Tesla guide](tesla.md#optional-lane-change-lamp-observations) for completion, timestamp and physical-validation limits.
 - `AutoCruiseControl` covers Hyundai/Kia auto-cruise and soft-hold behavior.
 - `DisableMinSteerSpeed` is vehicle-specific and relates to low-speed steering restrictions on SMDPS-equipped cars.
 
@@ -166,7 +171,7 @@ Volkswagen's separate `SET` button sets current speed and `RES` restores the pre
 | ONNX Lane and BSD | `ShareData`, `OnnxBsdEnabled`, `OnnxLaneThreshold`, `OnnxLaneIntervalMs`, `OnnxBsdThreshold`, `OnnxBsdSmoothingMs`, `OnnxBsdIntervalMs` | Lane-type detection plus separately controlled camera BSD and tuning |
 | Centering | `PathOffset`, `CameraYawTrimDeg` | Path position and camera-yaw trim |
 | Steering feel | `SteerActuatorDelay`, `LatSmoothSec`, `LatSuspendAngleDeg`, `CustomSR`, `SteerRatioRate` | Timing, smoothing, suspension angle, and steering ratio |
-| [Lane change](lane-change.md) and automatic turn | `LaneChangeNeedTorque`, `LaneChangeDelay`, `LaneChangeBsd`, `LaneLineCheck`, `BlinkerLatchedTurn`, `LaneChangeLeverWait`, `AutoTurnControl`, `AutoTurnControlRightLaneChange`, `ManualLaneChangeIndicator`, `ModelDesireIndicator`, `ModelPathIndicator`, `AutoTurnControlSpeedTurn`, `AutoTurnControlTurnEnd`, `AutoTurnMapChange` | Lane-change entry conditions and ATC behavior |
+| [Lane change](lane-change.md) and automatic turn | `LaneChangeNeedTorque`, `LaneChangeDelay`, `LaneChangeBsd`, `LaneLineCheck`, `BlinkerLatchedTurn`, `LaneChangeLeverWait`, `AutoTurnControl`, `AutoTurnControlRightLaneChange`, `ManualLaneChangeIndicator`, `ManualTurnIndicator`, `ModelDesireIndicator`, `ModelPathIndicator`, `AutoTurnControlSpeedTurn`, `AutoTurnControlTurnEnd`, `AutoTurnMapChange` | Lane-change entry conditions and ATC behavior |
 | Lane mode | `LatMpcPathCost`, `LatMpcMotionCost`, `LatMpcAccelCost`, `LatMpcJerkCost`, `LatMpcSteeringRateCost`, `LatMpcInputOffset`, `UseLaneLineSpeed`, `UseLaneLineCurveSpeed`, `AdjustLaneOffset` | Lane-mode MPC weights and lane-line conditions |
 | Advanced torque | `LateralTorqueCustom`, `LateralTorqueAccelFactor`, `LateralTorqueFriction`, `LateralTorqueKpV`, `LateralTorqueKiV`, `LateralTorqueKf`, `LateralTorqueKd` | Custom torque-control gains |
 | Advanced torque, search only | `NNFF` | Neural-network feedforward for torque steering |
@@ -367,6 +372,10 @@ While the external HUD is connected over USB, `ShowCameraWithCluster=0` switches
 
 The final `ClusterHudScreenMode` layout is:
 
+On `thftgr/carrot-wip-cluster`, onroad P selects the parking screen and R selects the reverse reference screen ahead of the selected mode. P shows the clock, tyre pressures, trip statistics and available battery level; R shows a steering-based guide and blind-spot state. Other gears and offroad restore the existing `carrot-wip` display. The driving layout and device-screen sleep behavior are unchanged.
+
+P/R car images follow the detected supported vehicle, falling back to EV6. Reverse lines use illustrative EV6 geometry; they are not rear-camera video or obstacle detection. Create `/data/ev6_park_screen_off` or `/data/ev6_reverse_screen_off` to disable only that screen. `/data/ev6_weather_off` disables parking weather queries. Weather uses the last position rounded to approximately 1 km for Open-Meteo and caches results for up to one hour.
+
 - `-1` uses the full width only in 3D camera views `0` and `1`, with no information panel or world shift. Left-side HUD items retain their margins, right-side gauges and TPMS align to the physical right edge, and the clock, world, and turn signals use the full-display center axis. In road-camera view `2`, it behaves exactly like mode `0`, including automatic navigation/report selection and `ClusterHudPanelLayout`.
 - `0` is the default screen. It shows navigation while live navigation is received and automatically shows the driving report otherwise.
 - `1` is the general live-debug screen, grouping delay, torque, steering, and lateral-plan state into four 2×2 cards. In 3D camera views, the world and driving HUD use the same 1124 px driving region as mode `0`, while the four cards fill the opposite 792 px information region. The acceleration, steering, fuel, and DEF gauges plus TPMS remain inside the driving region's right edge.
@@ -458,7 +467,7 @@ camera supplies 20fps. Reduced processing overhead does not establish sustained
 
 ## Automatic turn signals (supported vehicles)
 
-`AutoBlinkerControl` — Settings > Driving > Steering > Lane Change (Auto Turn). Default: 0. Currently limited to the Ioniq 5 PE, Jetson and PEAK USB-CAN/B1 profile on carrot-wip.
+`AutoBlinkerControl` — Settings > Driving > Steering > Lane Change (Auto Turn). Default: 0. Currently limited to the Ioniq 5 PE, Jetson and PEAK USB-CAN/B1 profile on carrot-wip. Cruise CANCEL stops automatic indicator requests and releases an automatic hold. Parking maneuvers no longer trigger an indication until SET/RES or +/− clears the cruise cancel state. The stock lever and explicit Bluetooth indicator buttons remain available.
 
 ATC indication starts at audioTurn and persists through stops. A fresh cue can start at a full stop in Drive when lateral permission remains valid and steering is fault-free. After the receiver confirms send completion, both lamps staying off for 1.5 seconds permits one recovery attempt per turn, including an initially unlit request. Driver cancellation, communication failure or an unconfirmed send forbids retry. A fresh opposite-turn cue waits at most three seconds for physical completion of the preceding turn.
 
@@ -488,13 +497,15 @@ A hold-start request without confirmed lamp activation expires after four second
 
 `AutoTurnControlRightLaneChange` under ATC details adds to modes 1 and 2 and triggers the physical right indicator before a TBT right turn or right fork, at 10km/h or above and within the configured distance, until turning starts. It requires the supported USB2CAN indicator setup, a right lane, fresh OEM BSD and right-front gaps of at least 5 m both now and after three seconds; existing manual/Bluetooth lane-change behavior is unchanged. See [lane changes](lane-change.md).
 
-`AutoTurnControlRightLaneChange` remains the separate ATC distance add-on. `ManualLaneChangeIndicator` independently retains recent intent for up to 1.5s. The left side excludes centre lines using fresh white-line classification; the right requires at least 2.5m from the target boundary to the road edge. Outer-line probability is not required. It never requests automatic steering. See [lane changes](lane-change.md).
+`ManualTurnIndicator` requests an indicator when driver steering and vehicle rotation agree. The wheel must reach 42 degrees and move at least 22 degrees from the start of steering. Detection resumes two seconds after the previous indication last renewed its hold, once both lamps have also been off for one continuous second. The setting defaults to off and can detect parking turns. [Manual turn conditions](lane-change.md)
+
+`AutoTurnControlRightLaneChange` remains the separate ATC distance add-on. `ManualLaneChangeIndicator` detects manual lane changes from 5 km/h and retains recent driver intent for up to 1.5s. The left side excludes centre lines using fresh white-line classification; the right requires at least 2.5m from the target boundary to the road edge. Outer-line probability is not required. It never requests automatic steering. See [lane changes](lane-change.md).
 
 The manual lane-change indicator can request again after at least three seconds, one continuous second of lamp extinction and fresh steering/approach conditions. Automatic-steering feedback isolation remains at least 12 seconds.
 
 An ATC recovery attempt has a new four-second activation deadline. It does not extend the five-minute maximum measured from the original request.
 
-`ModelDesireIndicator` and `ModelPathIndicator` are separate default-off indication-only options. See [lane changes](lane-change.md) for TBT distance holding and each feature’s start/end conditions.
+`ModelDesireIndicator` and `ModelPathIndicator` are separate default-off indication-only options. See [lane changes](lane-change.md) for TBT distance holding and each feature’s start/end conditions. At 30 km/h or above, the two nearest model forecasts can also trigger an indication when both predict the same lane change with at least 65% probability and both measured lane boundaries show the vehicle approaching that side. A forecast alone does not light the indicator or request steering. After forecast-based initiation, widening lane lines at a fork do not end the hold while the model and measured motion still indicate the same direction. Fading or opposite intent ends the fork hold; cruise CANCEL releases it immediately.
 
 Manual indication projects 0.3s of measured boundary approach, advancing the centre-to-boundary threshold by at most 0.3m. Existing speed, centre-line and road-edge gates remain.
 

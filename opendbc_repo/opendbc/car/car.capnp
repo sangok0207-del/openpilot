@@ -292,6 +292,25 @@ struct CarState {
   tbtRearInputsAvailable @110 :Bool; # fresh CANFD OEM BSD input for the TBT physical-indicator trigger only (BSD-only since 2026-10-30)
   tbtRightRearBlocked @111 :Bool = true; # OEM right BSD warning or invalid/stale BSD; no corner-distance veto; manual admission unchanged
   laneLineInfoMonoTime @112 :UInt64; # exact OEM lane type/colour CAN observation; zero means unknown, manual indicator only
+  teslaTrafficControl @113 :TeslaTrafficControl;
+  stockSccFault @114 :Bool; # original Casper FCA failure, before outgoing fault suppression
+  cruiseCancelState @115 :Bool; # Carrot cruise CANCEL latch, cleared by SET/RES or +/-.
+
+  struct TeslaTrafficControl {
+    available @0 :Bool;
+    valid @1 :Bool;
+    sampleMonoTime @2 :UInt64;
+    stopLineDistance @3 :Float32; # APP_trafficControl metres; legacy DAS_road is not supported
+    light @4 :Light;
+    status @5 :Text;
+
+    enum Light {
+      unknown @0;
+      red @1;
+      green @2;
+      yellow @3;
+    }
+  }
   struct VehicleGps {
     available @0 :Bool;
     valid @1 :Bool; # receive/continuity checks, not a decoded satellite fix flag
@@ -467,6 +486,7 @@ struct CarControl {
   # Blinker controls
   leftBlinker @15: Bool;
   rightBlinker @16: Bool;
+  assistantLaneSignalId @18 :Text; # Correlates an eligible voice request with the native indicator output.
 
   orientationNED @13 :List(Float32);
   angularVelocity @14 :List(Float32);
@@ -493,6 +513,7 @@ struct CarControl {
 
     jerk @9: Float32;  # m/s^3
     aTarget @10: Float32;  # m/s^2
+    stopObjectActive @11 :Bool; # synthetic signal-stop object included in the generated SCC packet
 
     enum LongControlState @0xe40f3a917d908282{
       off @0;
@@ -536,6 +557,7 @@ struct CarControl {
 
     driverMonitoringAlert @22: UInt8;  # 0=none, 1=initial, 2=audible, 3=terminal; fresh enabled DM only
     physicalBlinkerHold @23: UInt8;  # 0=legacy, 1=release, 2=left hold, 3=right hold; fresh USB-CAN lease
+    signalStopObject @24 :Bool; # request only; final SCC interlocks own application
 
     # not used with the dash, TODO: separate structs for dash UI and device UI
     audibleAlert @5: AudibleAlert;
