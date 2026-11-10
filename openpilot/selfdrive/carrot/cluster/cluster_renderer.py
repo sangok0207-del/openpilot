@@ -1854,7 +1854,7 @@ class ClusterUiRenderer:
 
     def render(self, state: ClusterUiState, signal_lights: tuple[bool, bool] | None = None) -> None:
         """Draw one frame into the currently active raylib render target."""
-        self._ego_body = state.vehicle_body
+        self._ego_body = getattr(state, "vehicle_body", "default")
         if self._ev6_park_screen_active(state):  # EV6 HUD patch v13: parked screen replaces the road view in P
             self._ev6_draw_park_screen(state)
         elif self._ev6_reverse_screen_active(state):
